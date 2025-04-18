@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.30)
 project(CHAsm)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 # ---- Native target: CHAsm emulator ----
 add_executable(CHAsm
@@ -21,9 +21,15 @@ add_executable(disassembler
         src/ISA_CONFIG.h
 )
 
+
 add_custom_target(all_native
         DEPENDS CHAsm disassembler
 )
+
+
+# Tests: Disassembler
+
+
 
 # ---- Manual RISC-V cross-compile target ----
 set(RISCV_COMPILER /opt/riscv-multilib/bin/riscv64-unknown-elf-gcc)
@@ -54,3 +60,4 @@ add_custom_target(run_riscv_test
         COMMENT "Running riscv_test via QEMU"
 )
 
+add_executable(disassembler_test testing/disassembler_test.cpp testing/disassembler_test.h)

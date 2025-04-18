@@ -14,146 +14,158 @@ enum MNEMONIC {
     JALR, LB, LH, LW, LBU, LHU, ADDI, SLTI, SLTIU, XORI, ORI, ANDI,
     SB, SH, SW,
     SLLI, SRLI, SRAI,
-    ADD,SUB,SLL,SLT,SLTU,XOR,SRL,SRA,OR,AND,
+    ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND,
     BEQ, BNE, BLT, BGE, BLTU, BGEU,
     JAL,
     FENCE, FENCE_TSO, PAUSE,
     ECALL, EBREAK
 };
 
+
+// ─── helper to go from enum→string ────────────────────────────────────────────
+inline const char *mnemonicToString(MNEMONIC m) {
+    static constexpr const char *names[] = {
+        "LUI", "AUIPC",
+        "JALR", "LB", "LH", "LW", "LBU", "LHU", "ADDI", "SLTI", "SLTIU", "XORI", "ORI", "ANDI",
+        "SB", "SH", "SW",
+        "SLLI", "SRLI", "SRAI",
+        "ADD", "SUB", "SLL", "SLT", "SLTU", "XOR", "SRL", "SRA", "OR", "AND",
+        "BEQ", "BNE", "BLT", "BGE", "BLTU", "BGEU",
+        "JAL",
+        "FENCE", "FENCE_TSO", "PAUSE",
+        "ECALL", "EBREAK"
+    };
+    return names[static_cast<size_t>(m)];
+}
+
 class Instruction {
-    INS_TYPE type;
-    uint32_t raw;
-    uint8_t opcode;
-    MNEMONIC mnemonic;
-
 public:
-    Instruction(std::string inputhex);
+    /// Factory: returns the correct subclass based on the low‑7 bits
+    static std::unique_ptr<Instruction> create(uint32_t raw);
 
-    Instruction(uint32_t raw);
+    virtual ~Instruction() = default;
 
-    std::unique_ptr<Instruction> create(uint32_t raw);
+    /// Must be overridden by every derived class
+    virtual std::string toString() const = 0;
+
+protected:
+    explicit Instruction(uint32_t raw)
+        : raw(raw), opcode(static_cast<uint8_t>(raw & 0x7F)) {
+    }
+
+    uint32_t raw; ///< the full 32‑bit instruction
+    uint8_t opcode; ///< bits[6:0]
+    MNEMONIC mnemonic; // ← store your enum here
+};
+
+/// I‑type: imm[31:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
+class IType : public Instruction {
+public:
+    explicit IType(uint32_t raw);
+
+    std::string toString() const override;
 
 private:
-    virtual std::string toString() const = 0;
-    virtual ~Instruction() = default;
+    int32_t imm; ///< sign‑extended 12‑bit immediate
+    uint8_t rs1, funct3, rd;
 };
 
+/// U‑type: imm[31:12] | rd[11:7] | opcode[6:0]
 class UType : public Instruction {
-
 public:
+    explicit UType(uint32_t raw);
+
+    std::string toString() const override;
+
+private:
     uint32_t imm; // 31:12
-    uint8_t rd;   // 11:7
-
-    UType(uint32_t raw) : Instruction(raw) {}
-
-
-    std::string toString() const override;
+    uint8_t rd; // 11:7
 };
 
-class IType : public Instruction {
-
-public:
-    uint16_t imm; // Immediate value (12-bit immediate)
-    uint8_t rs1;  // Source register 1 (bits 19–15)
-    uint8_t funct3; // Function code (bits 14–12)
-    uint8_t rd;   // Destination register (bits 11–7)
-
-    //IType(uint32_t raw) : Instruction(raw) {};
-
-    std::string toString() const override;
-
-    IType(uint32_t raw);
-};
-
+/// S‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
 class SType : public Instruction {
 public:
-    uint16_t imm; // Immediate value (12-bit immediate) 31:25
-    uint8_t rs2; // Source register 2 (bits 24–20)
-    uint8_t rs1; // Source register 1 (bits 19–15)
-    uint8_t funct3; // Function code (bits 14–12)
-    uint8_t imm2; // Immediate value (12-bit immediate) 11:7
+    explicit SType(uint32_t raw);
 
- //SType(uint32_t raw) : Instruction(raw) {};
     std::string toString() const override;
 
-    SType(uint32_t raw);
+private:
+    int32_t imm; // 31:25 and 11:7
+    uint8_t rs1, rs2, funct3;
 };
 
-// class RTypeShift : public Instruction {
-// public:
-//     uint8_t funct7; // Function code (bits 31–25)
-//     uint8_t shamt; // Shift amount (bits 24–20)
-//     uint8_t rs1;   // Source register 1 (bits 19–15)
-//     uint8_t funct3; // Function code (bits 14–12)
-//     uint8_t rd;    // Destination register (bits 11–7)
-//
-//     std::string toString() const override;
-// };
-
+/// R‑type: funct7[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
 class RType : public Instruction {
 public:
-    uint8_t funct7; // Function code (bits 31–25)
-    uint8_t rs2;  // Source register 2 (bits 24–20)
-    uint8_t rs1;   // Source register 1 (bits 19–15)
-    uint8_t funct3; // Function code (bits 14–12)
-    uint8_t rd;    // Destination register (bits 11–7)
-    //RType(uint32_t raw) : Instruction(raw) {};
+    explicit RType(uint32_t raw);
+
     std::string toString() const override;
 
-    RType(uint32_t raw);
-};
-
-class BType : public Instruction {
-public:
-    uint8_t imm_branch_offset; // Branch target offset (12-bit immediate, encoded non-contiguously) imm[12|10:5]
+private:
+    uint8_t funct7; // Function code (bits 31–25)
     uint8_t rs2; // Source register 2 (bits 24–20)
     uint8_t rs1; // Source register 1 (bits 19–15)
     uint8_t funct3; // Function code (bits 14–12)
-    uint8_t imm2; // Branch target offset (12-bit immediate, encoded non-contiguously) imm[4:1|11]
-
- //BType(uint32_t raw) : Instruction(raw) {};
-    std::string toString() const override;
-
-    BType(uint32_t raw);
+    uint8_t rd; // Destination register (bits 11–7)
 };
 
+/// B‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
+class BType : public Instruction {
+public:
+    explicit BType(uint32_t raw);
+
+    std::string toString() const override;
+
+private:
+    int32_t imm; ///< sign‑extended 12‑bit immediate
+    uint8_t rs1, rs2, funct3;
+};
+
+
+/// J‑type: imm[31:12] | rd[11:7] | opcode[6:0]
 class JType : public Instruction {
 public:
-    uint32_t imm;  // Jump target offset (20-bit immediate, encoded non-contiguously)
-    uint8_t rd;    // Destination register (bits 11–7)
-
- //JType(uint32_t raw) : Instruction(raw) {};
+    //JType(uint32_t raw) : Instruction(raw) {};
     std::string toString() const override;
 
-    JType(uint32_t raw);
+    explicit JType(uint32_t raw);
+
+private:
+    uint32_t imm; // Jump target offset (20-bit immediate, encoded non-contiguously)
+    uint8_t rd; // Destination register (bits 11–7)
 };
 
+/// FenceType: fence[31:28] | predicate[27:24] | succ[23:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
 class FenceType : public Instruction {
 public:
-    uint8_t fenceMode; // Fence mode (bits 31–28)
-    uint8_t predicate; // Predicate (bits 27–24)
+    //FenceType(uint32_t raw) : Instruction(raw) {};
+    std::string toString() const override;
+
+    explicit FenceType(uint32_t raw);
+
+private:
+    uint8_t fm; // Fence mode (bits 31–28)
+    uint8_t pred; // Predicate (bits 27–24)
     uint8_t succ; // Successor (bits 23–20)
     uint8_t rs1; // Source register 1 (bits 19–15)  - always all 0s
     uint8_t funct3; // Function code (bits 14–12) - always 000
     uint8_t rd; // Destination register (bits 11–7) - always all 0s
-
- //FenceType(uint32_t raw) : Instruction(raw) {};
-    std::string toString() const override;
-
-    FenceType(uint32_t raw);
 };
 
+
+/// SysType: zeroPadding[31:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
 class SysType : public Instruction {
+public:
+    //SysType(uint32_t raw) : Instruction(raw) {};
+    std::string toString() const override;
+
+    explicit SysType(uint32_t raw);
+
+private:
     uint16_t zeroPadding; // Zero padding (bits 31–20)
     uint8_t rs1; // Source register 1 (bits 19–15) - always all 0s
     uint8_t funct3; // Function code (bits 14–12) - always 000
     uint8_t rd; // Destination register (bits 11–7) - always all 0s
-
- //SysType(uint32_t raw) : Instruction(raw) {};
-    std::string toString() const override;
-
-    SysType(uint32_t raw);
 };
 
 // Factory method to create proper Instruction type from raw
