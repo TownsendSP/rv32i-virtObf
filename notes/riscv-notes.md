@@ -114,7 +114,6 @@ immediates are always sign-extended, and are generally packed towards the leftmo
 
 ### System Instructions (Environment Call/Break)
 
-
 | Zero Padding / Code`[31:20]` | Source Register rs1`[19:15]` | funct3`[14:12]` | Destination Register rd`[11:7]` | Opcode`[6:0]` | Instruction |
 | ---------------------------- | ---------------------------- | --------------- | ------------------------------- | ------------- | ----------- |
 | 000000000000                 | 00000                        | 000             | 00000                           | 1110011       | ECALL       |

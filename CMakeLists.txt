@@ -21,7 +21,6 @@ add_executable(disassembler
         src/ISA_CONFIG.h
 )
 
-
 add_custom_target(all_native
         DEPENDS CHAsm disassembler
 )
@@ -32,10 +31,10 @@ add_custom_target(all_native
 
 
 # ---- Manual RISC-V cross-compile target ----
-set(RISCV_COMPILER /opt/riscv-multilib/bin/riscv64-unknown-elf-gcc)
+set(RISCV_COMPILER /opt/riscv32-gnu-toolchain-elf-bin/bin/riscv32-unknown-elf-gcc)
 set(RISCV_ARCH "rv32i" CACHE STRING "RISC-V arch (rv32i or rv32e)")
 
-set(RISCV_SOURCE "/home/tgsp/Documents/Syracuse/2025_Spring/CompArch/TermPaper/CHAsm/riscv-experimentaiton/riscv-test.c")
+set(RISCV_SOURCE "/home/tgsp/CLionProjects/rv321-virtObf/riscv-experimentaiton/riscv-test.c")
 set(RISCV_OUTPUT "${CMAKE_BINARY_DIR}/riscv_test")
 
 # Custom command: compile rv32i test
