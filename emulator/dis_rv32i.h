@@ -40,12 +40,12 @@ inline const char *mnemonicToString(MNEMONIC m) {
 
 class Instruction {
 public:
-    /// Factory: returns the correct subclass based on the low‑7 bits
+    // Factory: returns the correct subclass based on the low‑7 bits
     static std::unique_ptr<Instruction> create(uint32_t raw);
 
     virtual ~Instruction() = default;
 
-    /// Must be overridden by every derived class
+    // Must be overridden by every derived class
     virtual std::string toString() const = 0;
 
 protected:
@@ -53,12 +53,12 @@ protected:
         : raw(raw), opcode(static_cast<uint8_t>(raw & 0x7F)) {
     }
 
-    uint32_t raw; ///< the full 32‑bit instruction
-    uint8_t opcode; ///< bits[6:0]
-    MNEMONIC mnemonic; // ← store your enum here
+    uint32_t raw; //< the full 32‑bit instruction
+    uint8_t opcode; //< bits[6:0]
+    MNEMONIC mnemonic; // enum goes here
 };
 
-/// I‑type: imm[31:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
+// I‑type: imm[31:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
 class IType : public Instruction {
 public:
     explicit IType(uint32_t raw);
@@ -66,11 +66,11 @@ public:
     std::string toString() const override;
 
 private:
-    int32_t imm; ///< sign‑extended 12‑bit immediate
+    int32_t imm; //< sign‑extended 12‑bit immediate
     uint8_t rs1, funct3, rd;
 };
 
-/// U‑type: imm[31:12] | rd[11:7] | opcode[6:0]
+// U‑type: imm[31:12] | rd[11:7] | opcode[6:0]
 class UType : public Instruction {
 public:
     explicit UType(uint32_t raw);
@@ -82,7 +82,7 @@ private:
     uint8_t rd; // 11:7
 };
 
-/// S‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
+// S‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
 class SType : public Instruction {
 public:
     explicit SType(uint32_t raw);
@@ -94,7 +94,7 @@ private:
     uint8_t rs1, rs2, funct3;
 };
 
-/// R‑type: funct7[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
+// R‑type: funct7[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
 class RType : public Instruction {
 public:
     explicit RType(uint32_t raw);
@@ -109,7 +109,7 @@ private:
     uint8_t rd; // Destination register (bits 11–7)
 };
 
-/// B‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
+// B‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
 class BType : public Instruction {
 public:
     explicit BType(uint32_t raw);
@@ -122,7 +122,7 @@ private:
 };
 
 
-/// J‑type: imm[31:12] | rd[11:7] | opcode[6:0]
+// J‑type: imm[31:12] | rd[11:7] | opcode[6:0]
 class JType : public Instruction {
 public:
     //JType(uint32_t raw) : Instruction(raw) {};
@@ -135,7 +135,7 @@ private:
     uint8_t rd; // Destination register (bits 11–7)
 };
 
-/// FenceType: fence[31:28] | predicate[27:24] | succ[23:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
+// FenceType: fence[31:28] | predicate[27:24] | succ[23:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
 class FenceType : public Instruction {
 public:
     //FenceType(uint32_t raw) : Instruction(raw) {};
@@ -153,7 +153,7 @@ private:
 };
 
 
-/// SysType: zeroPadding[31:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
+// SysType: zeroPadding[31:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
 class SysType : public Instruction {
 public:
     //SysType(uint32_t raw) : Instruction(raw) {};
