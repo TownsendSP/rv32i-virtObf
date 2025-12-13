@@ -71,3 +71,8 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+/scratch_tests/
+/notes/BUILD.md
+/notes/BUILD_FLOW.md
+/notes/SETUP_COMPLETE.md
+/notes/overall_project_guidelines.md

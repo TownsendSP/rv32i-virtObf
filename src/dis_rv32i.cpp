@@ -256,7 +256,7 @@ BType::BType(uint32_t raw)
             break;
         case 0b100: mnemonic = BLT;
             break;
-        case 0b101: mnemonic = wBGE;
+        case 0b101: mnemonic = BGE;
             break;
         case 0b110: mnemonic = BLTU;
             break;
