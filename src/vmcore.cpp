@@ -1,6 +1,11 @@
 #include "vmcore.h"
 #include <iostream>
 
+// Helper macro for safe dynamic_cast with null check
+#define SAFE_CAST(type, ptr, mnemonic_str) \
+    const type* ptr = dynamic_cast<const type*>(instr); \
+    if (!ptr) throw std::runtime_error("Failed to cast " mnemonic_str " instruction");
+
 vmcore::vmcore(): pc(0) {
     // Initialize VirtualMemory static layout
     VirtualMemory::init();
@@ -27,7 +32,7 @@ int32_t vmcore::execute(const std::vector<std::unique_ptr<Instruction>>& instruc
     pc = 0;
     
     // Execute instructions until RET
-    while (pc / 4 < instructions.size()) {
+    while (pc % 4 == 0 && pc / 4 < instructions.size()) {
         const Instruction* instr = instructions[pc / 4].get();
         
         // Check if this is a RET instruction
@@ -62,6 +67,7 @@ void vmcore::execute_instruction(const Instruction* instr) {
         }
         case AUIPC: {
             const UType* u = dynamic_cast<const UType*>(instr);
+            if (!u) throw std::runtime_error("Failed to cast AUIPC instruction");
             write_reg(u->getRd(), pc + u->getImm());
             pc += 4;
             break;
@@ -70,6 +76,7 @@ void vmcore::execute_instruction(const Instruction* instr) {
         // --- I-Type Arithmetic ---
         case ADDI: {
             const IType* i = dynamic_cast<const IType*>(instr);
+            if (!i) throw std::runtime_error("Failed to cast ADDI instruction");
             write_reg(i->getRd(), read_reg(i->getRs1()) + i->getImmediate());
             pc += 4;
             break;
@@ -329,7 +336,9 @@ void vmcore::execute_instruction(const Instruction* instr) {
         }
         case JALR: {
             const IType* i = dynamic_cast<const IType*>(instr);
-            uint32_t target = (read_reg(i->getRs1()) + i->getImmediate()) & ~1;
+            if (!i) throw std::runtime_error("Failed to cast JALR instruction");
+            // Clear LSB to ensure even alignment (RISC-V requirement)
+            uint32_t target = (read_reg(i->getRs1()) + i->getImmediate()) & ~1u;
             write_reg(i->getRd(), pc + 4);  // Save return address
             pc = target;
             break;

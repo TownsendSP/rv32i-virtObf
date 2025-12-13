@@ -43,7 +43,10 @@ std::vector<std::unique_ptr<Instruction>> disassemble(const std::vector<uint8_t>
         std::cerr << "Warning: Binary size is not a multiple of 4 bytes" << std::endl;
     }
     
-    for (size_t i = 0; i + 3 < binary.size(); i += 4) {
+    // Ensure the binary size is properly aligned
+    size_t aligned_size = (binary.size() / 4) * 4;
+    
+    for (size_t i = 0; i < aligned_size; i += 4) {
         // Read 32-bit instruction in little-endian format
         uint32_t raw = static_cast<uint32_t>(binary[i])
                      | (static_cast<uint32_t>(binary[i + 1]) << 8)
@@ -59,6 +62,12 @@ std::vector<std::unique_ptr<Instruction>> disassemble(const std::vector<uint8_t>
                       << std::dec << std::endl;
             // Continue parsing - skip this instruction
         }
+    }
+    
+    if (binary.size() % 4 != 0) {
+        std::cerr << "Warning: Binary size (" << binary.size() 
+                  << " bytes) is not aligned to 4 bytes. Last " 
+                  << (binary.size() % 4) << " byte(s) ignored." << std::endl;
     }
     
     return instructions;

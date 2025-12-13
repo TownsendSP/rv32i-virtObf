@@ -1,0 +1,1 @@
+/home/runner/work/rv32i-virtObf/.codeql-scratch/dbs/cpp/working/autobuild/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/disassembler.dir/link.d CMakeFiles/disassembler.dir/src/disassembler.cpp.o CMakeFiles/disassembler.dir/src/dis_rv32i.cpp.o CMakeFiles/disassembler.dir/src/ISA_CONFIG.cpp.o -o disassembler

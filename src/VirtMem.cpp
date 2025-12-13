@@ -5,6 +5,7 @@
 #include "VirtMem.h"
 #include <stdexcept>
 #include <string>
+#include <sstream>
 
 // Static member variable initialization
 uint32_t VirtualMemory::INITIAL_SIZE = 0;
@@ -40,7 +41,9 @@ void VirtualMemory::ensure_capacity(uint32_t addr) {
         try {
             memory.resize(new_size, 0);
         } catch (const std::bad_alloc& e) {
-            throw std::runtime_error("Memory allocation failed at address 0x" + std::to_string(addr));
+            std::ostringstream oss;
+            oss << "Memory allocation failed at address 0x" << std::hex << addr;
+            throw std::runtime_error(oss.str());
         }
     }
 }

@@ -1,0 +1,16 @@
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/disassembler.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/emulator.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/execrv32i.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/emu_rv32i.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/riscv_test.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/doOperation.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/only_fn_riscv_test.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/native.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/riscv.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/all_targets.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/edit_cache.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/rebuild_cache.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/list_install_components.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/install.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/install/local.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir/CMakeFiles/install/strip.dir
