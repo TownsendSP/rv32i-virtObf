@@ -1,0 +1,14 @@
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/disassembler.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/emulator.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/execrv32i.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/riscv_test.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/doOperation.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/native.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/riscv.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/all_targets.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/edit_cache.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/rebuild_cache.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/list_install_components.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/install.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/install/local.dir
+/home/runner/work/rv32i-virtObf/rv32i-virtObf/build/CMakeFiles/install/strip.dir
