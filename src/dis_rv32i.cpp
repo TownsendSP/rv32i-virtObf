@@ -32,7 +32,7 @@ std::unique_ptr<Instruction> Instruction::create(uint32_t raw) {
 // ------------------ IType ------------------
 IType::IType(uint32_t raw)
     : Instruction(raw)
-      , imm(static_cast<int32_t>(raw) >> 20) // bits [31:20], sign‑extend
+      , imm(static_cast<int32_t>(raw) >> 20) // bits [31:20], signâ€‘extend
       , rs1(static_cast<uint8_t>((raw >> 15) & 0x1F))
       , funct3(static_cast<uint8_t>((raw >> 12) & 0x07))
       , rd(static_cast<uint8_t>((raw >> 7) & 0x1F)) {
@@ -56,7 +56,7 @@ IType::IType(uint32_t raw)
                 case 0b101:
                     mnemonic = ((raw >> 30) & 1) ? SRAI : SRLI;
                     break;
-                default: throw std::invalid_argument("Unknown I‑type funct3");
+                default: throw std::invalid_argument("Unknown Iâ€‘type funct3");
             }
             break;
 
@@ -81,17 +81,25 @@ IType::IType(uint32_t raw)
             break;
 
         default:
-            throw std::invalid_argument("Opcode not I‑type in IType ctor");
+            throw std::invalid_argument("Opcode not Iâ€‘type in IType ctor");
     }
 }
 
 std::string IType::toString() const {
     std::ostringstream os;
-    // use our enum→string helper:
-    os << mnemonicToString(mnemonic)
-            << " x" << int(rd)
-            << ", x" << int(rs1)
-            << ", " << imm;
+    os << mnemonicToString(mnemonic);
+
+    // Loads use offset(base) syntax: LB, LH, LW, LBU, LHU
+    if (mnemonic == LB || mnemonic == LH || mnemonic == LW ||
+        mnemonic == LBU || mnemonic == LHU) {
+        os << " x" << int(rd)
+           << ", " << imm
+           << "(x" << int(rs1) << ")";
+    } else {
+        os << " x" << int(rd)
+           << ", x" << int(rs1)
+           << ", " << imm;
+    }
     return os.str();
 }
 
@@ -106,13 +114,13 @@ UType::UType(uint32_t raw)
         case 0b0010111: mnemonic = AUIPC;
             break;
         default:
-            throw std::invalid_argument("Opcode not U‑type in UType ctor: received opcode " + std::to_string(opcode));
+            throw std::invalid_argument("Opcode not Uâ€‘type in UType ctor: received opcode " + std::to_string(opcode));
     }
 }
 
 std::string UType::toString() const {
     std::ostringstream os;
-    // use our enum→string helper:
+    // use our enumâ†’string helper:
     os << mnemonicToString(mnemonic)
             << " x" << int(rd)
             << ", " << imm;
@@ -123,12 +131,12 @@ std::string UType::toString() const {
 
 SType::SType(uint32_t raw)
     : Instruction(raw) {
-    // split the two halves of the 12‑bit imm
+    // split the two halves of the 12â€‘bit imm
     uint32_t hi5 = (raw >> 25) & 0x7F; // imm[11:5]
     uint32_t lo5 = (raw >> 7) & 0x1F; // imm[4:0]
     uint32_t imm12 = (hi5 << 5) | lo5; // combine into [11:0]
 
-    // sign‑extend to 32 bits
+    // signâ€‘extend to 32 bits
     if (imm12 & 0x800)
         imm = static_cast<int32_t>(imm12 | 0xFFFFF000);
     else
@@ -147,7 +155,7 @@ SType::SType(uint32_t raw)
             break;
         case 0b010: mnemonic = SW;
             break;
-        default: throw std::invalid_argument("Unknown S‑type funct3");
+        default: throw std::invalid_argument("Unknown Sâ€‘type funct3");
     }
 }
 
@@ -156,6 +164,7 @@ std::string SType::toString() const {
     os << mnemonicToString(mnemonic) << " x" << int(rs2)
             << ", " << imm
             << "(x" << int(rs1) << ")";
+    return os.str();
 }
 
 // ------------------ RType ------------------
@@ -175,7 +184,7 @@ RType::RType(uint32_t raw)
                            ? ADD
                            : (funct7 == 0b0100000)
                                  ? SUB
-                                 : throw std::invalid_argument("Unknown R‑type funct7 for funct3=000");
+                                 : throw std::invalid_argument("Unknown Râ€‘type funct7 for funct3=000");
             break;
         case 0b001: mnemonic = SLL;
             break;
@@ -190,14 +199,14 @@ RType::RType(uint32_t raw)
                            ? SRL
                            : (funct7 == 0b0100000)
                                  ? SRA
-                                 : throw std::invalid_argument("Unknown R‑type funct7 for funct3=101");
+                                 : throw std::invalid_argument("Unknown Râ€‘type funct7 for funct3=101");
             break;
         case 0b110: mnemonic = OR;
             break;
         case 0b111: mnemonic = AND;
             break;
         default:
-            throw std::invalid_argument("Unknown R‑type funct3");
+            throw std::invalid_argument("Unknown Râ€‘type funct3");
     }
 }
 
@@ -270,9 +279,23 @@ std::string BType::toString() const {
 
 JType::JType(uint32_t raw)
     : Instruction(raw) {
-    // extract and sign-extend contiguous 20-bit immediate from bits [31:12]
-    // mask = binary 11111111111111111111000000000000
-    imm = static_cast<int32_t>(raw & 0b11111111111111111111000000000000) >> 11;
+    // J-type immediate is scrambled: imm[20|10:1|11|19:12] in bits [31|30:21|20|19:12]
+    uint32_t b20    = (raw >> 31) & 0b1;          // imm[20]
+    uint32_t b10_1  = (raw >> 21) & 0b1111111111; // imm[10:1]
+    uint32_t b11    = (raw >> 20) & 0b1;          // imm[11]
+    uint32_t b19_12 = (raw >> 12) & 0b11111111;   // imm[19:12]
+
+    // Combine into 21-bit immediate (bit 0 is always 0)
+    uint32_t imm21 = (b20 << 20)
+                   | (b19_12 << 12)
+                   | (b11 << 11)
+                   | (b10_1 << 1);
+
+    // Sign-extend from bit 20
+    if (imm21 & 0x100000)
+        imm = static_cast<int32_t>(imm21 | 0xFFE00000);
+    else
+        imm = static_cast<int32_t>(imm21);
 
     // extract destination register
     rd = static_cast<uint8_t>((raw >> 7) & 0b11111); // bits [11:7]
@@ -306,12 +329,12 @@ FenceType::FenceType(uint32_t raw)
         throw std::invalid_argument("Invalid fence funct3");
 
     // decide exact fence variant
-    if      (fm == 0b0000 && pred == 0b0000 && succ == 0b0000)
-        mnemonic = FENCE;
-    else if (fm == 0b1000 && pred == 0b0011 && succ == 0b0011)
+    if (fm == 0b1000 && pred == 0b0011 && succ == 0b0011)
         mnemonic = FENCE_TSO;
     else if (fm == 0b0000 && pred == 0b0001 && succ == 0b0000)
         mnemonic = PAUSE;
+    else if (fm == 0b0000)
+        mnemonic = FENCE;  // Regular FENCE with any pred/succ combination
     else
         throw std::invalid_argument("Unknown fence variant");
 }

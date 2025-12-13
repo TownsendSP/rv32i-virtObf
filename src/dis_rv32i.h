@@ -48,6 +48,17 @@ public:
     // Must be overridden by every derived class
     virtual std::string toString() const = 0;
 
+    // Getters for instruction analysis
+    uint32_t getRaw() const { return raw; }
+    uint8_t getOpcode() const { return opcode; }
+    MNEMONIC getMnemonic() const { return mnemonic; }
+
+    // Methods for control flow analysis
+    virtual bool isBranch() const { return false; }
+    virtual bool isJump() const { return false; }
+    virtual bool isConditional() const { return false; }
+    virtual int32_t getImmediate() const { return 0; }  // For branch/jump targets
+
 protected:
     explicit Instruction(uint32_t raw)
         : raw(raw), opcode(static_cast<uint8_t>(raw & 0x7F)) {
@@ -64,6 +75,9 @@ public:
     explicit IType(uint32_t raw);
 
     std::string toString() const override;
+
+    bool isJump() const override { return mnemonic == JALR; }
+    int32_t getImmediate() const override { return imm; }
 
 private:
     int32_t imm; //< sign‑extended 12‑bit immediate
@@ -116,6 +130,10 @@ public:
 
     std::string toString() const override;
 
+    bool isBranch() const override { return true; }
+    bool isConditional() const override { return true; }
+    int32_t getImmediate() const override { return imm; }
+
 private:
     int32_t imm; ///< sign‑extended 12‑bit immediate
     uint8_t rs1, rs2, funct3;
@@ -130,8 +148,11 @@ public:
 
     explicit JType(uint32_t raw);
 
+    bool isJump() const override { return true; }
+    int32_t getImmediate() const override { return imm; }
+
 private:
-    uint32_t imm; // Jump target offset (20-bit immediate, encoded non-contiguously)
+    int32_t imm;   // Jump target offset (sign-extended 21-bit immediate)
     uint8_t rd; // Destination register (bits 11–7)
 };
 

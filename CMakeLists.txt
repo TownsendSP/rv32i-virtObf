@@ -6,17 +6,19 @@ set(CMAKE_CXX_STANDARD 17)
 # ---- Native target: CHAsm emulator ----
 add_executable(CHAsm
         main.cpp
-        src/vm/vmcore.cpp
-        src/vm/vmcore.h
+        src/vmcore.cpp
+        src/vmcore.h
         src/ISA_CONFIG.cpp
         src/ISA_CONFIG.h
+        src/cpu_rv32i.cpp
+        src/cpu_rv32i.h
 )
 
 # ---- Native target: RV32I Disassembler ----
 add_executable(disassembler
-        emulator/dis_rv32i.cpp
-        emulator/dis_rv32i.h
-        emulator/disassembler.cpp
+        src/dis_rv32i.cpp
+        src/dis_rv32i.h
+        src/disassembler.cpp
         src/ISA_CONFIG.cpp
         src/ISA_CONFIG.h
 )
