@@ -8,8 +8,10 @@
 #include <cstdint>
 #include <vector>
 #include <stdexcept>
+#include <memory>
 
 #include "VirtMem.h"
+#include "dis_rv32i.h"
 
 // Main VM core - executes RV32I instructions
 class vmcore {
@@ -31,6 +33,10 @@ public:
     // Load a program into memory
     void load_program(const std::vector<uint8_t>& program);
 
+    // Execute a vector of instruction objects until RET
+    // Returns the value in register a0 (x10)
+    int32_t execute(const std::vector<std::unique_ptr<Instruction>>& instructions, int32_t arg0, int32_t arg1);
+
     // Read register (handles x0 special case)
     uint32_t read_reg(uint8_t reg) const;
 
@@ -47,6 +53,10 @@ public:
     void branch(int32_t offset);
 
     void jump(uint32_t target);
+
+private:
+    // Execute a single instruction
+    void execute_instruction(const Instruction* instr);
 };
 
 #endif //VMCORE_H

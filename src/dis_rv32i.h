@@ -81,6 +81,10 @@ public:
     bool isJump() const override { return mnemonic == JALR; }
     int32_t getImmediate() const override { return imm; }
 
+    uint8_t getRd() const { return rd; }
+    uint8_t getRs1() const { return rs1; }
+    uint8_t getFunct3() const { return funct3; }
+
 private:
     int32_t imm; //< sign‑extended 12‑bit immediate
     uint8_t rs1, funct3, rd;
@@ -92,6 +96,9 @@ public:
     explicit UType(uint32_t raw);
 
     std::string toString() const override;
+
+    uint8_t getRd() const { return rd; }
+    uint32_t getImm() const { return imm; }
 
 private:
     uint32_t imm; // 31:12
@@ -105,6 +112,11 @@ public:
 
     std::string toString() const override;
 
+    uint8_t getRs1() const { return rs1; }
+    uint8_t getRs2() const { return rs2; }
+    uint8_t getFunct3() const { return funct3; }
+    int32_t getImm() const { return imm; }
+
 private:
     int32_t imm; // 31:25 and 11:7
     uint8_t rs1, rs2, funct3;
@@ -116,6 +128,12 @@ public:
     explicit RType(uint32_t raw);
 
     std::string toString() const override;
+
+    uint8_t getRd() const { return rd; }
+    uint8_t getRs1() const { return rs1; }
+    uint8_t getRs2() const { return rs2; }
+    uint8_t getFunct3() const { return funct3; }
+    uint8_t getFunct7() const { return funct7; }
 
 private:
     uint8_t funct7; // Function code (bits 31–25)
@@ -136,6 +154,10 @@ public:
     bool isConditional() const override { return true; }
     int32_t getImmediate() const override { return imm; }
 
+    uint8_t getRs1() const { return rs1; }
+    uint8_t getRs2() const { return rs2; }
+    uint8_t getFunct3() const { return funct3; }
+
 private:
     int32_t imm; ///< sign‑extended 12‑bit immediate
     uint8_t rs1, rs2, funct3;
@@ -152,6 +174,8 @@ public:
 
     bool isJump() const override { return true; }
     int32_t getImmediate() const override { return imm; }
+
+    uint8_t getRd() const { return rd; }
 
 private:
     int32_t imm;   // Jump target offset (sign-extended 21-bit immediate)

@@ -110,6 +110,17 @@ target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
 
 # ============================================================================
+# TARGET 3B: EMU_RV32I - Simple Emulator (Native x64)
+# ============================================================================
+# This executable emulates a single RISC-V function
+add_executable(emu_rv32i
+        emu_rv32i.cpp
+)
+
+target_link_libraries(emu_rv32i PRIVATE emulator ${CMAKE_DL_LIBS})
+target_compile_options(emu_rv32i PRIVATE ${NATIVE_CXX_FLAGS})
+
+# ============================================================================
 # TARGET 4: RISC-V VIRTUALIZED FUNCTIONS (Bare-Metal Only)
 # ============================================================================
 
@@ -180,6 +191,7 @@ endfunction()
 
 add_riscv_function(riscv_test "${TARGET_DIR}/riscv-test.c")
 add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
+add_riscv_function(only_fn_riscv_test "${TARGET_DIR}/only_fn_riscv_test.c")
 
 # ============================================================================
 # CONVENIENCE TARGETS
@@ -187,12 +199,12 @@ add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
 
 # Build all native (x64) components
 add_custom_target(native ALL
-        DEPENDS disassembler emulator execrv32i
+        DEPENDS disassembler emulator execrv32i emu_rv32i
 )
 
 # Build all RISC-V components
 add_custom_target(riscv ALL
-        DEPENDS riscv_test doOperation
+        DEPENDS riscv_test doOperation only_fn_riscv_test
 )
 
 # Build everything
@@ -203,7 +215,7 @@ add_custom_target(all_targets ALL
 # ============================================================================
 # INSTALLATION (Optional)
 # ============================================================================
-install(TARGETS disassembler execrv32i emulator
+install(TARGETS disassembler execrv32i emu_rv32i emulator
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
 )
