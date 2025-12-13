@@ -77,7 +77,11 @@ IType::IType(uint32_t raw)
             break;
 
         case 0b1100111: // JALR
-            mnemonic = JALR;
+            if (rd == 0 && rs1 == 1 && imm == 0) {
+                mnemonic = RET;
+            } else {
+                mnemonic = JALR;
+            }
             break;
 
         default:
@@ -88,6 +92,10 @@ IType::IType(uint32_t raw)
 std::string IType::toString() const {
     std::ostringstream os;
     os << mnemonicToString(mnemonic);
+
+    if (mnemonic == RET) {
+        return os.str();
+    }
 
     // Loads use offset(base) syntax: LB, LH, LW, LBU, LHU
     if (mnemonic == LB || mnemonic == LH || mnemonic == LW ||

@@ -42,10 +42,10 @@ set(NATIVE_C_FLAGS -Wall -Wextra)
 set(NATIVE_CXX_FLAGS -Wall -Wextra)
 
 # --- RISC-V Bare-Metal flags (for production obfuscator) ---
-set(RISCV_TARGET_FLAGS -target riscv32-unknown-elf -march=${RISCV_ARCH} -mabi=${RISCV_ABI} -00)
+set(RISCV_TARGET_FLAGS -target riscv32-unknown-elf -march=${RISCV_ARCH} -mabi=${RISCV_ABI})
 set(RISCV_LINK_FLAGS -nostdlib -nostartfiles -static)
-set(RISCV_C_FLAGS ${RISCV_TARGET_FLAGS} -Wall)
-set(RISCV_CXX_FLAGS ${RISCV_TARGET_FLAGS} -Wall)
+set(RISCV_C_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
+set(RISCV_CXX_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 
 # ============================================================================
 # DIRECTORIES
@@ -82,7 +82,12 @@ target_compile_options(disassembler PRIVATE ${NATIVE_CXX_FLAGS})
 add_library(emulator SHARED
         ${SRC_DIR}/vmcore.cpp
         ${SRC_DIR}/vmcore.h
+        ${SRC_DIR}/cpu_rv32i.cpp
+        ${SRC_DIR}/cpu_rv32i.h
+        ${SRC_DIR}/VirtMem.cpp
+        ${SRC_DIR}/VirtMem.h
         ${COMMON_SOURCES}
+
 )
 
 target_compile_options(emulator PRIVATE ${NATIVE_CXX_FLAGS} -fPIC)
@@ -173,8 +178,8 @@ endfunction()
 # Add your virtualized functions here
 # Example: add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
 
-# Compile the test file
 add_riscv_function(riscv_test "${TARGET_DIR}/riscv-test.c")
+add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
 
 # ============================================================================
 # CONVENIENCE TARGETS
@@ -187,7 +192,7 @@ add_custom_target(native ALL
 
 # Build all RISC-V components
 add_custom_target(riscv ALL
-        DEPENDS riscv_test
+        DEPENDS riscv_test doOperation
 )
 
 # Build everything

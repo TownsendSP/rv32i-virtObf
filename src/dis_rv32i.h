@@ -17,6 +17,7 @@ enum MNEMONIC {
     ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND,
     BEQ, BNE, BLT, BGE, BLTU, BGEU,
     JAL,
+    RET,
     FENCE, FENCE_TSO, PAUSE,
     ECALL, EBREAK
 };
@@ -32,6 +33,7 @@ inline const char *mnemonicToString(MNEMONIC m) {
         "ADD", "SUB", "SLL", "SLT", "SLTU", "XOR", "SRL", "SRA", "OR", "AND",
         "BEQ", "BNE", "BLT", "BGE", "BLTU", "BGEU",
         "JAL",
+        "RET",
         "FENCE", "FENCE_TSO", "PAUSE",
         "ECALL", "EBREAK"
     };
