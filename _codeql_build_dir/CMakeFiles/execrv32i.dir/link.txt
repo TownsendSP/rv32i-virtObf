@@ -1,1 +1,0 @@
-/home/runner/work/rv32i-virtObf/.codeql-scratch/dbs/cpp/working/autobuild/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/execrv32i.dir/link.d CMakeFiles/execrv32i.dir/main.cpp.o -o execrv32i  -Wl,-rpath,/home/runner/work/rv32i-virtObf/rv32i-virtObf/_codeql_build_dir: emulator.so -ldl

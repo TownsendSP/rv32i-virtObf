@@ -77,3 +77,4 @@ dkms.conf
 /notes/SETUP_COMPLETE.md
 /notes/overall_project_guidelines.md
 /build/
+/_codeql_build_dir/
