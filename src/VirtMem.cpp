@@ -3,6 +3,8 @@
 //
 
 #include "VirtMem.h"
+#include <stdexcept>
+#include <string>
 
 // Static member variable initialization
 uint32_t VirtualMemory::INITIAL_SIZE = 0;
@@ -13,11 +15,11 @@ uint32_t VirtualMemory::STACK_START = 0;
 
 // Initialize static memory layout values
 void VirtualMemory::init() {
-    INITIAL_SIZE = 2 * 1024 * 1024;      // Start with 2MB
+    INITIAL_SIZE = 8 * 1024 * 1024;      // Start with 8MB
     CODE_START = 0x00010000;             // Code at 64KB
     DATA_START = 0x00100000;             // Data at 1MB
     HEAP_START = 0x01000000;             // Heap at 16MB
-    STACK_START = 0x7fff0000;            // Stack at ~2GB, grows down
+    STACK_START = 0x00800000;            // Stack at 8MB, grows down
 }
 
 VirtualMemory::VirtualMemory()
@@ -30,8 +32,16 @@ VirtualMemory::VirtualMemory()
 void VirtualMemory::ensure_capacity(uint32_t addr) {
     if (addr >= memory.size()) {
         // Grow memory as needed
-        size_t new_size = std::max(addr + 1, static_cast<uint32_t>(memory.size() * 2));
-        memory.resize(new_size, 0);
+        size_t new_size = std::max(static_cast<size_t>(addr) + 1, memory.size() * 2);
+        // Cap at 64MB to avoid excessive memory allocation
+        if (new_size > 64 * 1024 * 1024) {
+            new_size = std::max(static_cast<size_t>(addr) + 1, static_cast<size_t>(64 * 1024 * 1024));
+        }
+        try {
+            memory.resize(new_size, 0);
+        } catch (const std::bad_alloc& e) {
+            throw std::runtime_error("Memory allocation failed at address 0x" + std::to_string(addr));
+        }
     }
 }
 

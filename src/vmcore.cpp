@@ -2,6 +2,9 @@
 #include <iostream>
 
 vmcore::vmcore(): pc(0) {
+    // Initialize VirtualMemory static layout
+    VirtualMemory::init();
+    
     // Initialize all registers to 0
     for (int i = 0; i < 32; i++) {
         registers[i] = 0;
@@ -42,12 +45,17 @@ int32_t vmcore::execute(const std::vector<std::unique_ptr<Instruction>>& instruc
 }
 
 void vmcore::execute_instruction(const Instruction* instr) {
+    if (!instr) {
+        throw std::runtime_error("Null instruction pointer");
+    }
+    
     MNEMONIC mnem = instr->getMnemonic();
     
     switch (mnem) {
         // --- U-Type Instructions ---
         case LUI: {
             const UType* u = dynamic_cast<const UType*>(instr);
+            if (!u) throw std::runtime_error("Failed to cast LUI instruction");
             write_reg(u->getRd(), u->getImm());
             pc += 4;
             break;
