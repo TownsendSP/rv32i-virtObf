@@ -10,6 +10,7 @@
 #include <stdexcept>
 
 #include "VirtMem.h"
+#include "dis_rv32i.h"
 
 // Main VM core - executes RV32I instructions
 class vmcore {
@@ -47,6 +48,9 @@ public:
     void branch(int32_t offset);
 
     void jump(uint32_t target);
+
+    // Execute a sequence of instructions
+    void execute(const std::vector<std::unique_ptr<Instruction>>& instructions);
 };
 
 #endif //VMCORE_H

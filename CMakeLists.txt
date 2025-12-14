@@ -101,10 +101,10 @@ set_target_properties(emulator PROPERTIES
 # TARGET 3: EXECRV32I - Emulator Executor (Native x64)
 # ============================================================================
 # This executable loads emulator.so and executes a virtualized RV32I function
-add_executable(execrv32i
-        main.cpp
-        # We'll need to update main.cpp to implement the executor functionality
-)
+add_executable(execrv32i main.cpp src/dis_rv32i.cpp src/vmcore.cpp src/VirtMem.cpp src/ISA_CONFIG.cpp)
+
+# Emulator target
+add_executable(emu_rv32i src/emu_rv32i.cpp src/dis_rv32i.cpp src/vmcore.cpp src/VirtMem.cpp src/ISA_CONFIG.cpp)
 
 target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
@@ -216,7 +216,6 @@ install(FILES
         OPTIONAL
 )
 
-# ============================================================================
 # ============================================================================
 # SUMMARY
 # ============================================================================

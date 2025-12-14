@@ -30,7 +30,7 @@ VirtualMemory::VirtualMemory()
 void VirtualMemory::ensure_capacity(uint32_t addr) {
     if (addr >= memory.size()) {
         // Grow memory as needed
-        size_t new_size = std::max(addr + 1, static_cast<uint32_t>(memory.size() * 2));
+        size_t new_size = std::max(static_cast<size_t>(addr) + 1, static_cast<size_t>(memory.size() * 2));
         memory.resize(new_size, 0);
     }
 }
