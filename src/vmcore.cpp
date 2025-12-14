@@ -1,7 +1,5 @@
 #include "vmcore.h"
 
-#include "dis_rv32i.h"
-
 vmcore::vmcore(): pc(0) {
     // Initialize all registers to 0
     for (int i = 0; i < 32; i++) {
