@@ -101,8 +101,6 @@ add_executable(execrv32i
 target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
 
-# Note: disassembler.cpp and emu_rv32i.cpp are now obsolete - functionality integrated into main.cpp
-
 # ============================================================================
 # TARGET 4: RISC-V VIRTUALIZED FUNCTIONS (Bare-Metal Only)
 # ============================================================================
