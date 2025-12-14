@@ -1,5 +1,7 @@
-// execrv32i - RV32I Virtualized Function Executor
-// Usage: execrv32i <function.rv32i> --arguments <args.txt>
+// execrv32i - RV32I Disassembler and Emulator
+// Usage:
+//   execrv32i dis <function.rv32i> [base_address]
+//   execrv32i emu <function.rv32i> [arg1] [arg2] ...
 
 #include <iostream>
 #include <fstream>
@@ -7,26 +9,32 @@
 #include <string>
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
+#include <memory>
 
-// TODO: Include emulator interface when vmcore.h is implemented
-// #include "src/vmcore.h"
-// #include "src/dis_rv32i.h"
+#include "src/cpu_rv32i.h"
+#include "src/dis_rv32i.h"
 
 void print_usage(const char* progname) {
-    std::cerr << "Usage: " << progname << " <function.rv32i> --arguments <args.txt>\n";
+    std::cerr << "RV32I Disassembler and Emulator\n\n";
+    std::cerr << "Usage:\n";
+    std::cerr << "  " << progname << " dis <binary.rv32i> [base_address]\n";
+    std::cerr << "  " << progname << " emu <binary.rv32i> [arg1] [arg2] ...\n";
     std::cerr << "\n";
-    std::cerr << "Arguments:\n";
-    std::cerr << "  function.rv32i  - Path to virtualized RV32I function binary\n";
-    std::cerr << "  --arguments     - Path to arguments file (format: space-separated integers)\n";
+    std::cerr << "Commands:\n";
+    std::cerr << "  dis  - Disassemble a RV32I binary file\n";
+    std::cerr << "  emu  - Emulate a RV32I function with optional arguments\n";
     std::cerr << "\n";
-    std::cerr << "Example:\n";
-    std::cerr << "  " << progname << " output/doOperation.rv32i --arguments args.txt\n";
+    std::cerr << "Examples:\n";
+    std::cerr << "  " << progname << " dis output/doOperation.rv32i\n";
+    std::cerr << "  " << progname << " dis output/doOperation.rv32i 0x10000\n";
+    std::cerr << "  " << progname << " emu testing_utils/only_fn_riscv_test.rv32i 5 6\n";
     std::cerr << "\n";
-    std::cerr << "Arguments file format (args.txt):\n";
-    std::cerr << "  5 3\n";
-    std::cerr << "  (This passes two integer arguments: a=5, b=3)\n";
 }
 
+/**
+ * Reads a binary file and returns its contents as a vector of bytes
+ */
 std::vector<uint8_t> read_binary_file(const std::string& filepath) {
     std::ifstream file(filepath, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
@@ -44,103 +52,151 @@ std::vector<uint8_t> read_binary_file(const std::string& filepath) {
     return buffer;
 }
 
-std::vector<int32_t> parse_arguments(const std::string& filepath) {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open arguments file: " + filepath);
+/**
+ * Disassembles a binary buffer into a vector of Instruction objects
+ * Assumes little-endian byte order
+ */
+std::vector<std::unique_ptr<Instruction>> disassemble(const std::vector<uint8_t>& binary, uint32_t baseAddress = 0) {
+    std::vector<std::unique_ptr<Instruction>> instructions;
+
+    // RISC-V instructions are 4 bytes aligned
+    if (binary.size() % 4 != 0) {
+        std::cerr << "Warning: Binary size is not a multiple of 4 bytes" << std::endl;
     }
-    
-    std::vector<int32_t> args;
-    int32_t value;
-    while (file >> value) {
-        args.push_back(value);
+
+    for (size_t i = 0; i + 3 < binary.size(); i += 4) {
+        // Read 32-bit instruction in little-endian format
+        uint32_t raw = static_cast<uint32_t>(binary[i])
+                     | (static_cast<uint32_t>(binary[i + 1]) << 8)
+                     | (static_cast<uint32_t>(binary[i + 2]) << 16)
+                     | (static_cast<uint32_t>(binary[i + 3]) << 24);
+
+        try {
+            instructions.push_back(Instruction::create(raw));
+        } catch (const std::invalid_argument& e) {
+            std::cerr << "Warning at offset 0x" << std::hex << (baseAddress + i)
+                      << ": " << e.what()
+                      << " (raw: 0x" << std::setfill('0') << std::setw(8) << raw << ")"
+                      << std::dec << std::endl;
+        }
     }
-    
-    return args;
+
+    return instructions;
+}
+
+/**
+ * Prints disassembly with addresses
+ */
+void print_disassembly(const std::vector<std::unique_ptr<Instruction>>& instructions, uint32_t baseAddress = 0) {
+    uint32_t addr = baseAddress;
+    for (const auto& instr : instructions) {
+        std::cout << std::hex << std::setfill('0') << std::setw(8) << addr << ":  "
+                  << std::setw(8) << instr->getRaw() << "  "
+                  << std::dec << instr->toString();
+
+        // Show control flow info
+        if (instr->isBranch() || instr->isJump()) {
+            int32_t offset = instr->getImmediate();
+            uint32_t target = addr + offset;
+            std::cout << "  # target: 0x" << std::hex << target << std::dec;
+        }
+
+        std::cout << std::endl;
+        addr += 4;
+    }
+}
+
+bool disassemble(int argc, char **argv, std::string filepath, int &value1) {
+    uint32_t baseAddress = 0;
+
+    // Parse optional base address
+    if (argc >= 4) {
+        try {
+            baseAddress = std::stoul(argv[3], nullptr, 16);
+        } catch (const std::exception& e) {
+            std::cerr << "Invalid base address: " << argv[3] << std::endl;
+            value1 = 1;
+            return true;
+        }
+    }
+    std::vector<uint8_t> binary = read_binary_file(filepath);
+    std::cout << "Loaded " << binary.size() << " bytes from " << filepath << std::endl;
+    std::cout << std::endl;
+
+    std::vector<std::unique_ptr<Instruction>> instructions = disassemble(binary, baseAddress);
+    std::cout << "Disassembled " << instructions.size() << " instructions:" << std::endl;
+    std::cout << std::string(60, '-') << std::endl;
+
+    print_disassembly(instructions, baseAddress);
+    return false;
+}
+
+void emulate(int argc, char **argv, std::string filepath) {
+    mem_rv32i::init();
+    std::vector<uint8_t> binary = read_binary_file(filepath);
+
+    // disassemble
+    std::vector<std::unique_ptr<Instruction>> instructions;
+    if (binary.size() % 4 != 0) {
+        throw std::runtime_error("Binary size is not a multiple of 4");
+    }
+
+    for (size_t i = 0; i < binary.size(); i += 4) {
+        uint32_t raw = 0;
+        // Little-endian load
+        raw |= binary[i];
+        raw |= (uint32_t)binary[i+1] << 8;
+        raw |= (uint32_t)binary[i+2] << 16;
+        raw |= (uint32_t)binary[i+3] << 24;
+
+        instructions.push_back(Instruction::create(raw));
+    }
+
+    cpu_rv32i vm;
+    vm.load_program(binary);
+
+    // args are passed in a0-a7 (x10-x17)
+    int arg_reg_start = 10;
+    int max_args = 8;
+
+    for (int i = 3; i < argc && (i - 3) < max_args; ++i) {
+        try {
+            // Support both decimal and hex (via 0 base)
+            uint32_t val = std::stoul(argv[i], nullptr, 0);
+            vm.write_reg(arg_reg_start + (i - 3), val);
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: Failed to parse argument '" << argv[i] << "': " << e.what() << "\n";
+        }
+    }
+
+    vm.execute(instructions);
+    uint32_t result = vm.read_reg(10); // a0
+
+    std::cout << result << std::endl;
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
+    if (argc < 3) {
         print_usage(argv[0]);
         return 1;
     }
     
-    std::string rv32i_path;
-    std::string args_path;
-    
-    // Parse command line arguments
-    for (int i = 1; i < argc; i++) {
-        if (std::strcmp(argv[i], "--arguments") == 0 || std::strcmp(argv[i], "-a") == 0) {
-            if (i + 1 < argc) {
-                args_path = argv[++i];
-            } else {
-                std::cerr << "Error: --arguments requires a file path\n";
-                return 1;
-            }
-        } else if (rv32i_path.empty()) {
-            rv32i_path = argv[i];
+    std::string command = argv[1];
+    std::string filepath = argv[2];
+
+    try {
+        if (command == "dis") {
+            int retcode;
+            if (disassemble(argc, argv, filepath, retcode)) return retcode;
+        } else if (command == "emu") {
+            emulate(argc, argv, filepath);
+
         } else {
-            std::cerr << "Error: Unknown argument: " << argv[i] << "\n";
+            std::cerr << "Error: Unknown command '" << command << "'\n";
             print_usage(argv[0]);
             return 1;
         }
-    }
-    
-    if (rv32i_path.empty()) {
-        std::cerr << "Error: No RV32I function file specified\n";
-        print_usage(argv[0]);
-        return 1;
-    }
-    
-    try {
-        // Load the RV32I binary
-        std::cout << "Loading RV32I function: " << rv32i_path << "\n";
-        std::vector<uint8_t> function_binary = read_binary_file(rv32i_path);
-        std::cout << "  Loaded " << function_binary.size() << " bytes\n";
-        
-        // Load arguments if specified
-        std::vector<int32_t> args;
-        if (!args_path.empty()) {
-            std::cout << "Loading arguments: " << args_path << "\n";
-            args = parse_arguments(args_path);
-            std::cout << "  Loaded " << args.size() << " arguments: ";
-            for (size_t i = 0; i < args.size(); i++) {
-                std::cout << args[i];
-                if (i < args.size() - 1) std::cout << ", ";
-            }
-            std::cout << "\n";
-        }
-        
-        // TODO: Disassemble the binary to Instruction objects
-        // std::vector<std::unique_ptr<Instruction>> instructions = disassemble(function_binary);
-        
-        // TODO: Initialize the emulator
-        // vmcore emulator;
-        
-        // TODO: Load instructions into emulator
-        // emulator.load_program(instructions);
-        
-        // TODO: Set up arguments (convention: a0=arg0, a1=arg1, etc.)
-        // for (size_t i = 0; i < args.size() && i < 8; i++) {
-        //     emulator.set_register(10 + i, args[i]);  // a0-a7 are x10-x17
-        // }
-        
-        // TODO: Execute the virtualized function
-        // emulator.execute();
-        
-        // TODO: Get the return value (convention: a0 holds return value)
-        // int32_t result = emulator.get_register(10);  // a0 is x10
-        
-        std::cout << "\n[NOT YET IMPLEMENTED]\n";
-        std::cout << "TODO: Emulator execution will happen here\n";
-        std::cout << "TODO: Disassemble binary -> Instruction objects\n";
-        std::cout << "TODO: Initialize vmcore emulator\n";
-        std::cout << "TODO: Load program and set arguments\n";
-        std::cout << "TODO: Execute and retrieve result\n";
-        
-        // Placeholder return
-        // std::cout << "\nResult: " << result << "\n";
-        
+
         return 0;
         
     } catch (const std::exception& e) {

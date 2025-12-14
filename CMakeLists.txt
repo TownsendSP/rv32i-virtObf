@@ -66,26 +66,15 @@ set(COMMON_SOURCES
         ${SRC_DIR}/ISA_CONFIG.h
 )
 
-# ============================================================================
-# TARGET 1: DISASSEMBLER (Native x64)
-# ============================================================================
-add_executable(disassembler
-        ${SRC_DIR}/disassembler.cpp
-        ${COMMON_SOURCES}
-)
-
-target_compile_options(disassembler PRIVATE ${NATIVE_CXX_FLAGS})
 
 # ============================================================================
 # TARGET 2: EMULATOR SHARED LIBRARY (Native x64)
 # ============================================================================
 add_library(emulator SHARED
-        ${SRC_DIR}/vmcore.cpp
-        ${SRC_DIR}/vmcore.h
         ${SRC_DIR}/cpu_rv32i.cpp
         ${SRC_DIR}/cpu_rv32i.h
-        ${SRC_DIR}/VirtMem.cpp
-        ${SRC_DIR}/VirtMem.h
+        ${SRC_DIR}/mem_rv32i.cpp
+        ${SRC_DIR}/mem_rv32i.h
         ${COMMON_SOURCES}
 
 )
@@ -98,16 +87,21 @@ set_target_properties(emulator PROPERTIES
 )
 
 # ============================================================================
-# TARGET 3: EXECRV32I - Emulator Executor (Native x64)
+# TARGET 3: EXECRV32I - Unified Disassembler and Emulator (Native x64)
 # ============================================================================
-# This executable loads emulator.so and executes a virtualized RV32I function
-add_executable(execrv32i main.cpp src/dis_rv32i.cpp src/vmcore.cpp src/VirtMem.cpp src/ISA_CONFIG.cpp)
-
-# Emulator target
-add_executable(emu_rv32i src/emu_rv32i.cpp src/dis_rv32i.cpp src/vmcore.cpp src/VirtMem.cpp src/ISA_CONFIG.cpp)
+# This executable provides both disassembly and emulation capabilities
+add_executable(execrv32i
+        main.cpp
+        ${SRC_DIR}/dis_rv32i.cpp
+        ${SRC_DIR}/cpu_rv32i.cpp
+        ${SRC_DIR}/mem_rv32i.cpp
+        ${SRC_DIR}/ISA_CONFIG.cpp
+)
 
 target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
+
+# Note: disassembler.cpp and emu_rv32i.cpp are now obsolete - functionality integrated into main.cpp
 
 # ============================================================================
 # TARGET 4: RISC-V VIRTUALIZED FUNCTIONS (Bare-Metal Only)
@@ -187,7 +181,7 @@ add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
 
 # Build all native (x64) components
 add_custom_target(native ALL
-        DEPENDS disassembler emulator execrv32i
+        DEPENDS emulator execrv32i
 )
 
 # Build all RISC-V components
@@ -203,7 +197,7 @@ add_custom_target(all_targets ALL
 # ============================================================================
 # INSTALLATION (Optional)
 # ============================================================================
-install(TARGETS disassembler execrv32i emulator
+install(TARGETS execrv32i emulator
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
 )
@@ -230,6 +224,6 @@ message(STATUS "RISC-V ABI: ${RISCV_ABI}")
 message(STATUS "Output Directory: ${OUTPUT_DIR}")
 message(STATUS "")
 message(STATUS "Build Targets:")
-message(STATUS "  Native: disassembler, emulator.so, execrv32i")
+message(STATUS "  Native: emulator.so, execrv32i (unified disassembler + emulator)")
 message(STATUS "  RISC-V: riscv_test")
 message(STATUS "============================")
