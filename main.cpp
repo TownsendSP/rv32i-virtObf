@@ -112,21 +112,20 @@ void print_disassembly(const std::vector<std::unique_ptr<Instruction>>& instruct
     }
 }
 
-bool disassemble(int argc, char **argv, std::string filepath, int &value1) {
+bool disassemble(int argc, char **argv, const std::vector<uint8_t>& binary, int arg_start_index, int &value1) {
     uint32_t baseAddress = 0;
 
     // Parse optional base address
-    if (argc >= 4) {
+    if (argc > arg_start_index) {
         try {
-            baseAddress = std::stoul(argv[3], nullptr, 16);
+            baseAddress = std::stoul(argv[arg_start_index], nullptr, 16);
         } catch (const std::exception& e) {
-            std::cerr << "Invalid base address: " << argv[3] << std::endl;
+            std::cerr << "Invalid base address: " << argv[arg_start_index] << std::endl;
             value1 = 1;
             return true;
         }
     }
-    std::vector<uint8_t> binary = read_binary_file(filepath);
-    std::cout << "Loaded " << binary.size() << " bytes from " << filepath << std::endl;
+    std::cout << "Loaded " << binary.size() << " bytes" << std::endl;
     std::cout << std::endl;
 
     std::vector<std::unique_ptr<Instruction>> instructions = disassemble(binary, baseAddress);
@@ -137,9 +136,8 @@ bool disassemble(int argc, char **argv, std::string filepath, int &value1) {
     return false;
 }
 
-void emulate(int argc, char **argv, std::string filepath) {
+void emulate(int argc, char **argv, const std::vector<uint8_t>& binary, int arg_start_index) {
     mem_rv32i::init();
-    std::vector<uint8_t> binary = read_binary_file(filepath);
 
     // disassemble
     std::vector<std::unique_ptr<Instruction>> instructions;
@@ -165,11 +163,11 @@ void emulate(int argc, char **argv, std::string filepath) {
     int arg_reg_start = 10;
     int max_args = 8;
 
-    for (int i = 3; i < argc && (i - 3) < max_args; ++i) {
+    for (int i = arg_start_index; i < argc && (i - arg_start_index) < max_args; ++i) {
         try {
             // Support both decimal and hex (via 0 base)
             uint32_t val = std::stoul(argv[i], nullptr, 0);
-            vm.write_reg(arg_reg_start + (i - 3), val);
+            vm.write_reg(arg_reg_start + (i - arg_start_index), val);
         } catch (const std::exception& e) {
             std::cerr << "Warning: Failed to parse argument '" << argv[i] << "': " << e.what() << "\n";
         }
@@ -208,14 +206,46 @@ int main(int argc, char* argv[]) {
     }
     
     std::string command = argv[1];
-    std::string filepath = argv[2];
+    
+    // Check for --obfuscated flag
+    bool is_obfuscated = false;
+    std::string filepath;
+    int arg_start_index = 0;
+
+    // Basic argument parsing logic
+    // argv[0] = progname
+    // argv[1] = command
+    // argv[2] = filepath OR --obfuscated
+    
+    if (std::string(argv[2]) == "--obfuscated") {
+        if (argc < 4) {
+            std::cerr << "Error: Missing filepath after --obfuscated\n";
+            return 1;
+        }
+        is_obfuscated = true;
+        filepath = argv[3];
+        arg_start_index = 4;
+    } else {
+        filepath = argv[2];
+        arg_start_index = 3;
+    }
 
     try {
         if (command == "dis") {
+            std::vector<uint8_t> data = read_binary_file(filepath);
+            if (is_obfuscated) {
+                restore(data);
+                std::cout << "Deobfuscated input file before processing.\n";
+            }
             int retcode;
-            if (disassemble(argc, argv, filepath, retcode)) return retcode;
+            if (disassemble(argc, argv, data, arg_start_index, retcode)) return retcode;
         } else if (command == "emu") {
-            emulate(argc, argv, filepath);
+            std::vector<uint8_t> data = read_binary_file(filepath);
+            if (is_obfuscated) {
+                restore(data);
+                std::cout << "Deobfuscated input file before processing.\n";
+            }
+            emulate(argc, argv, data, arg_start_index);
         } else if (command == "obf") {
             if (argc < 4) {
                 std::cerr << "Error: Missing output file for obf\n";
