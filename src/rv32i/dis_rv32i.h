@@ -81,9 +81,10 @@ public:
     bool isJump() const override { return mnemonic == JALR; }
     int32_t getImmediate() const override { return imm; }
 
-private:
     int32_t imm; //< sign‑extended 12‑bit immediate
     uint8_t rs1, funct3, rd;
+
+private:
 };
 
 // U‑type: imm[31:12] | rd[11:7] | opcode[6:0]
@@ -93,9 +94,10 @@ public:
 
     std::string toString() const override;
 
-private:
     uint32_t imm; // 31:12
     uint8_t rd; // 11:7
+
+private:
 };
 
 // S‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
@@ -105,9 +107,10 @@ public:
 
     std::string toString() const override;
 
-private:
     int32_t imm; // 31:25 and 11:7
     uint8_t rs1, rs2, funct3;
+
+private:
 };
 
 // R‑type: funct7[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
@@ -117,12 +120,13 @@ public:
 
     std::string toString() const override;
 
-private:
     uint8_t funct7; // Function code (bits 31–25)
     uint8_t rs2; // Source register 2 (bits 24–20)
     uint8_t rs1; // Source register 1 (bits 19–15)
     uint8_t funct3; // Function code (bits 14–12)
     uint8_t rd; // Destination register (bits 11–7)
+
+private:
 };
 
 // B‑type: imm[31:25] | rs2[24:20] | rs1[19:15] | funct3[14:12] | imm[11:7] | opcode[6:0]
@@ -136,9 +140,10 @@ public:
     bool isConditional() const override { return true; }
     int32_t getImmediate() const override { return imm; }
 
-private:
     int32_t imm; ///< sign‑extended 12‑bit immediate
     uint8_t rs1, rs2, funct3;
+
+private:
 };
 
 
@@ -153,9 +158,10 @@ public:
     bool isJump() const override { return true; }
     int32_t getImmediate() const override { return imm; }
 
-private:
     int32_t imm;   // Jump target offset (sign-extended 21-bit immediate)
     uint8_t rd; // Destination register (bits 11–7)
+
+private:
 };
 
 // FenceType: fence[31:28] | predicate[27:24] | succ[23:20] | rs1[19:15] | funct3[14:12] | rd[11:7] | opcode[6:0]
@@ -166,13 +172,14 @@ public:
 
     explicit FenceType(uint32_t raw);
 
-private:
     uint8_t fm; // Fence mode (bits 31–28)
     uint8_t pred; // Predicate (bits 27–24)
     uint8_t succ; // Successor (bits 23–20)
     uint8_t rs1; // Source register 1 (bits 19–15)  - always all 0s
     uint8_t funct3; // Function code (bits 14–12) - always 000
     uint8_t rd; // Destination register (bits 11–7) - always all 0s
+
+private:
 };
 
 
@@ -184,11 +191,12 @@ public:
 
     explicit SysType(uint32_t raw);
 
-private:
     uint16_t zeroPadding; // Zero padding (bits 31–20)
     uint8_t rs1; // Source register 1 (bits 19–15) - always all 0s
     uint8_t funct3; // Function code (bits 14–12) - always 000
     uint8_t rd; // Destination register (bits 11–7) - always all 0s
+
+private:
 };
 
 // Factory method to create proper Instruction type from raw

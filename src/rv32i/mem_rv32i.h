@@ -1,5 +1,5 @@
-#ifndef VIRTMEM_H
-#define VIRTMEM_H
+#ifndef MEM_RV32I_H
+#define MEM_RV32I_H
 
 #include <vector>
 #include <cstdint>
@@ -7,7 +7,7 @@
 
 // Memory layout for RV32I emulation
 // This provides a simple, auto-growing memory system
-class VirtualMemory {
+class mem_rv32i {
 private:
     // Static memory layout values - initialized in init()
     static uint32_t INITIAL_SIZE;
@@ -28,7 +28,7 @@ private:
 public:
     static void init();
 
-    VirtualMemory();
+    mem_rv32i();
 
     // Load code into memory at the code section
     void load_code(const std::vector<uint8_t>& code);
@@ -55,4 +55,4 @@ public:
     // Debug info
     size_t get_memory_size() const { return memory.size(); }
 };
-#endif //VIRTMEM_H
+#endif //MEM_RV32I_H

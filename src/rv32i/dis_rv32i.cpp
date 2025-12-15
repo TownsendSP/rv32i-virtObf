@@ -382,3 +382,7 @@ std::string SysType::toString() const {
     os << mnemonicToString(mnemonic);
     return os.str();
 }
+
+std::unique_ptr<Instruction> decodeInstruction(uint32_t rawInst) {
+    return Instruction::create(rawInst);
+}

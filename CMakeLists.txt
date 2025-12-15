@@ -1,29 +1,15 @@
 cmake_minimum_required(VERSION 3.20)
 project(rv32i_VirtualizingObfuscator)
 
+# Dependencies
+find_package(argparse CONFIG REQUIRED)
+
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ============================================================================
-# TOOLCHAIN CONFIGURATION
-# ============================================================================
-# Currently using native LLVM/Clang for both x64 and RISC-V cross-compilation
-# Uncomment and modify these to use specific toolchain installations:
 
-# --- Native x64 Toolchain (commented out - using system default) ---
-# set(CMAKE_C_COMPILER "/usr/bin/clang")
-# set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
-
-# --- RISC-V Bare-Metal Toolchain ---
-# Option 1: Use installed GNU RISC-V toolchain
-# set(RISCV_TOOLCHAIN_PREFIX "/opt/riscv32-gnu-toolchain-elf-llvm-bin")
-# set(RISCV_C_COMPILER "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-clang")
-# set(RISCV_CXX_COMPILER "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-clang++")
-# set(RISCV_OBJCOPY "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-objcopy")
-# set(RISCV_OBJDUMP "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-objdump")
-
-# Option 2: Use native LLVM with cross-compilation (CURRENT)
 set(RISCV_C_COMPILER "clang")
 set(RISCV_CXX_COMPILER "clang++")
 set(RISCV_OBJCOPY "llvm-objcopy")
@@ -33,61 +19,39 @@ set(RISCV_OBJDUMP "llvm-objdump")
 set(RISCV_ARCH "rv32i" CACHE STRING "RISC-V architecture (rv32i, rv32im, etc.)")
 set(RISCV_ABI "ilp32" CACHE STRING "RISC-V ABI (ilp32 for RV32I)")
 
-# ============================================================================
-# COMPILER FLAGS
-# ============================================================================
-
-# --- Native x64 flags ---
+# --- Native flags
 set(NATIVE_C_FLAGS -Wall -Wextra)
 set(NATIVE_CXX_FLAGS -Wall -Wextra)
 
-# --- RISC-V Bare-Metal flags (for production obfuscator) ---
+# --- rv32i flags
 set(RISCV_TARGET_FLAGS -target riscv32-unknown-elf -march=${RISCV_ARCH} -mabi=${RISCV_ABI})
 set(RISCV_LINK_FLAGS -nostdlib -nostartfiles -static)
 set(RISCV_C_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 set(RISCV_CXX_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 
-# ============================================================================
 # DIRECTORIES
-# ============================================================================
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
 set(TARGET_DIR "${CMAKE_SOURCE_DIR}/target")
 set(OUTPUT_DIR "${CMAKE_BINARY_DIR}/output")
 
 file(MAKE_DIRECTORY ${OUTPUT_DIR})
 
-# ============================================================================
-# COMMON/SHARED CODE (used by multiple targets)
-# ============================================================================
+# Common Code
 set(COMMON_SOURCES
-        ${SRC_DIR}/dis_rv32i.cpp
-        ${SRC_DIR}/dis_rv32i.h
-        ${SRC_DIR}/ISA_CONFIG.cpp
-        ${SRC_DIR}/ISA_CONFIG.h
+        ${SRC_DIR}/rv32i/dis_rv32i.cpp
+        ${SRC_DIR}/rv32i/dis_rv32i.h
 )
 
-# ============================================================================
-# TARGET 1: DISASSEMBLER (Native x64)
-# ============================================================================
-add_executable(disassembler
-        ${SRC_DIR}/disassembler.cpp
-        ${COMMON_SOURCES}
-)
 
-target_compile_options(disassembler PRIVATE ${NATIVE_CXX_FLAGS})
-
-# ============================================================================
-# TARGET 2: EMULATOR SHARED LIBRARY (Native x64)
-# ============================================================================
+# Emulator Library (Shared)
 add_library(emulator SHARED
-        ${SRC_DIR}/vmcore.cpp
-        ${SRC_DIR}/vmcore.h
-        ${SRC_DIR}/cpu_rv32i.cpp
-        ${SRC_DIR}/cpu_rv32i.h
-        ${SRC_DIR}/VirtMem.cpp
-        ${SRC_DIR}/VirtMem.h
+        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
+        ${SRC_DIR}/rv32i/cpu_rv32i.h
+        ${SRC_DIR}/rv32i/mem_rv32i.cpp
+        ${SRC_DIR}/rv32i/mem_rv32i.h
+        ${SRC_DIR}/obf/restore.cpp
+        ${SRC_DIR}/obf/restore.h
         ${COMMON_SOURCES}
-
 )
 
 target_compile_options(emulator PRIVATE ${NATIVE_CXX_FLAGS} -fPIC)
@@ -97,23 +61,59 @@ set_target_properties(emulator PROPERTIES
         SUFFIX ".so"
 )
 
-# ============================================================================
-# TARGET 3: EXECRV32I - Emulator Executor (Native x64)
-# ============================================================================
-# This executable loads emulator.so and executes a virtualized RV32I function
-add_executable(execrv32i
-        main.cpp
-        # We'll need to update main.cpp to implement the executor functionality
+# Emulator Library (Static)
+add_library(emulator_static STATIC
+        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
+        ${SRC_DIR}/rv32i/cpu_rv32i.h
+        ${SRC_DIR}/rv32i/mem_rv32i.cpp
+        ${SRC_DIR}/rv32i/mem_rv32i.h
+        ${SRC_DIR}/rv32i/emulator_api.cpp
+        ${SRC_DIR}/obf/restore.cpp
+        ${SRC_DIR}/obf/restore.h
+        ${COMMON_SOURCES}
 )
 
-target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
+target_compile_options(emulator_static PRIVATE ${NATIVE_CXX_FLAGS})
+set_target_properties(emulator_static PROPERTIES
+        OUTPUT_NAME "emulator_static"
+        PREFIX "lib"
+        SUFFIX ".a"
+)
+
+# ============================================================================
+# DIST TARGET
+# ============================================================================
+add_custom_target(dist
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:execrv32i> ${CMAKE_BINARY_DIR}/dist/execrv32i
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:emulator_static> ${CMAKE_BINARY_DIR}/dist/libemulator_static.a
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/rv32i/emulator_api.h ${CMAKE_BINARY_DIR}/dist/emulator_api.h
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/obf/gen_trampoline.py ${CMAKE_BINARY_DIR}/dist/gen_trampoline.py
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/obf/obfuscate.py ${CMAKE_BINARY_DIR}/dist/obfuscate.py
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/obf/CMakeLists.txt.template ${CMAKE_BINARY_DIR}/dist/CMakeLists.txt.template
+    COMMAND chmod +x ${CMAKE_BINARY_DIR}/dist/obfuscate.py
+    COMMAND chmod +x ${CMAKE_BINARY_DIR}/dist/gen_trampoline.py
+    DEPENDS execrv32i emulator_static
+    COMMENT "Packaging tools to ${CMAKE_BINARY_DIR}/dist"
+)
+
+# ============================================================================
+# TARGET 3: EXECRV32I - Unified Disassembler and Emulator (Native x64)
+# ============================================================================
+# This executable provides both disassembly and emulation capabilities
+add_executable(execrv32i
+        main.cpp
+        ${SRC_DIR}/rv32i/dis_rv32i.cpp
+        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
+        ${SRC_DIR}/rv32i/mem_rv32i.cpp
+        ${SRC_DIR}/obf/obfuscate.cpp
+        ${SRC_DIR}/obf/restore.cpp
+)
+
+target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS} argparse::argparse)
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
 
-# ============================================================================
-# TARGET 4: RISC-V VIRTUALIZED FUNCTIONS (Bare-Metal Only)
-# ============================================================================
-
-# Function to compile a C source file to RISC-V bare-metal and extract binary
+# Function to compile a C source file to rv32i and extract binary
 function(add_riscv_function TARGET_NAME SOURCE_FILE)
     set(OBJ_FILE "${OUTPUT_DIR}/${TARGET_NAME}.o")
     set(ELF_FILE "${OUTPUT_DIR}/${TARGET_NAME}.elf")
@@ -187,7 +187,7 @@ add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
 
 # Build all native (x64) components
 add_custom_target(native ALL
-        DEPENDS disassembler emulator execrv32i
+        DEPENDS emulator execrv32i
 )
 
 # Build all RISC-V components
@@ -203,7 +203,7 @@ add_custom_target(all_targets ALL
 # ============================================================================
 # INSTALLATION (Optional)
 # ============================================================================
-install(TARGETS disassembler execrv32i emulator
+install(TARGETS execrv32i emulator
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
 )
@@ -230,6 +230,6 @@ message(STATUS "RISC-V ABI: ${RISCV_ABI}")
 message(STATUS "Output Directory: ${OUTPUT_DIR}")
 message(STATUS "")
 message(STATUS "Build Targets:")
-message(STATUS "  Native: disassembler, emulator.so, execrv32i")
+message(STATUS "  Native: emulator.so, execrv32i (unified disassembler + emulator)")
 message(STATUS "  RISC-V: riscv_test")
 message(STATUS "============================")
