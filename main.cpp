@@ -15,6 +15,7 @@
 
 #include "src/rv32i/cpu_rv32i.h"
 #include "src/rv32i/dis_rv32i.h"
+#include "src/rv32i/regs_rv32i.h"
 #include "src/obf/obfuscate.h"
 #include "src/obf/restore.h"
 
@@ -104,9 +105,10 @@ void run_disassemble(const std::string& filepath, uint32_t baseAddress, bool is_
 
     std::vector<std::unique_ptr<Instruction>> instructions = disassemble(data, baseAddress);
     std::cout << "Disassembled " << instructions.size() << " instructions:" << std::endl;
-    std::cout << std::string(60, '-') << std::endl;
 
+    std::cout << std::string(60, '-') << std::endl;
     print_disassembly(instructions, baseAddress);
+
 }
 
 void run_emulate(const std::string& filepath, const std::vector<std::string>& args, bool is_obfuscated) {
@@ -192,6 +194,11 @@ int main(int argc, char* argv[]) {
         .help("Deobfuscate the input file before processing")
         .default_value(false)
         .implicit_value(true);
+    dis_command.add_argument("--onlyasm")
+    .help("Only Output the assembly, omitting the address and hex columns")
+    .default_value(false)
+    .implicit_value(true);
+
 
     argparse::ArgumentParser emu_command("emu");
     emu_command.add_description("Emulate a RV32I function with optional arguments");
@@ -237,7 +244,7 @@ int main(int argc, char* argv[]) {
             std::string binary = dis_command.get<std::string>("binary");
             std::string base_addr_str = dis_command.get<std::string>("base_address");
             bool obfuscated = dis_command.get<bool>("--obfuscated");
-            
+
             uint32_t base_address = 0;
             try {
                 base_address = std::stoul(base_addr_str, nullptr, 16);

@@ -13,72 +13,6 @@ CAPSTONE_SCRIPT = os.path.join(PROJECT_ROOT, "testing_infrastructure", "testing_
 UNICORN_SCRIPT = os.path.join(PROJECT_ROOT, "testing_infrastructure", "testing_utils", "unicorn_test_harness.py")
 
 # Register mapping (ABI -> xN)
-ABI_TO_X = {
-    "zero": "x0", "ra": "x1", "sp": "x2", "gp": "x3", "tp": "x4", "t0": "x5", "t1": "x6", "t2": "x7",
-    "s0": "x8", "fp": "x8", "s1": "x9", "a0": "x10", "a1": "x11", "a2": "x12", "a3": "x13",
-    "a4": "x14", "a5": "x15", "a6": "x16", "a7": "x17", "s2": "x18", "s3": "x19", "s4": "x20",
-    "s5": "x21", "s6": "x22", "s7": "x23", "s8": "x24", "s9": "x25", "s10": "x26", "s11": "x27",
-    "t3": "x28", "t4": "x29", "t5": "x30", "t6": "x31"
-}
-
-def normalize_instruction(instr_str):
-    """
-    Normalize instruction string for comparison.
-    - Lowercase
-    - Replace ABI registers with xN
-    - Convert hex immediates to decimal
-    - Remove extra whitespace
-    """
-    instr_str = instr_str.lower().strip()
-    # Strip comments
-    if '#' in instr_str:
-        instr_str = instr_str.split('#')[0].strip()
-    
-    # Replace commas and parens with spaces for easier tokenization
-    # But keep them for structure if needed? 
-    # Let's try to tokenize by splitting on delimiters
-    tokens = re.split(r'[ ,()]+', instr_str)
-    tokens = [t for t in tokens if t] # Remove empty tokens
-    
-    normalized_tokens = []
-    for token in tokens:
-        # Check if register
-        if token in ABI_TO_X:
-            normalized_tokens.append(ABI_TO_X[token])
-        elif token.startswith('x') and token[1:].isdigit():
-            normalized_tokens.append(token) # Already xN
-        else:
-            # Check if immediate (hex or decimal)
-            try:
-                val = int(token, 0) # Handles 0x and decimal
-                normalized_tokens.append(str(val))
-            except ValueError:
-                normalized_tokens.append(token)
-                
-    norm_str = " ".join(normalized_tokens)
-    
-    # Handle aliases
-    # jal x0, offset -> j offset
-    if norm_str.startswith("jal x0 "):
-        norm_str = "j " + norm_str[7:]
-    
-    # jal x1, offset -> jal offset
-    if norm_str.startswith("jal x1 "):
-        norm_str = "jal " + norm_str[7:]
-    
-    # addi x0, x0, 0 -> nop
-    if norm_str == "addi x0 x0 0":
-        return "nop"
-        
-    # addi rd, rs, 0 -> mv rd, rs
-    # Regex: addi (x\d+) (x\d+) 0
-    match = re.match(r"addi (x\d+) (x\d+) 0", norm_str)
-    if match:
-        rd, rs = match.groups()
-        return f"mv {rd} {rs}"
-        
-    return norm_str
-
 class TestValidation(unittest.TestCase):
     def setUp(self):
         self.assertTrue(os.path.exists(EXECRV32I), f"execrv32i not found at {EXECRV32I}")
@@ -177,17 +111,6 @@ class TestValidation(unittest.TestCase):
             if not line.strip():
                 continue
                 
-            # Line format: "00000000:  ff010113  ADDI x2, x2, -16"
-            # We want "ADDI x2, x2, -16"
-            # It starts at index 22 (approx)
-            parts = line.split("  ")
-            # parts[0] is "00000000:", parts[1] is "ff010113", parts[2] is "ADDI..."
-            # But splitting by double space might be fragile if instruction has double space?
-            # Let's use fixed width or regex
-            # Address is 8 chars + ":  " = 11 chars
-            # Raw is 8 chars + "  " = 10 chars
-            # Total prefix is 21 chars?
-            # Let's try regex
             match = re.match(r"[0-9a-fA-F]+:\s+[0-9a-fA-F]+\s+(.*)", line)
             if match:
                 instructions.append(match.group(1))

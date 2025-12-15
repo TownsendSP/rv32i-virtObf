@@ -1,0 +1,43 @@
+# Top-level list of tests. Each item must contain:
+#   test_name: string
+#   test_main: path/to/test_main (string)
+#   test_h: path/to/header.h (string)
+#   test_c: path/to/source.c (string)
+#   args: [int, int, ...]  # list of N integers
+
+tests:
+  - test_name: addition_01
+    test_dir: test_source/test-arithmetic
+    test_main: arith_test.c
+    fn_name: addition
+    args: [123, 456]
+
+  - test_name: addition_02
+    test_dir: test_source/test-arithmetic
+    test_main: arith_test.c
+    fn_name: addition
+    args: [0, 0]
+
+  - test_name: addition_02
+    test_dir: test_source/test-arithmetic
+    test_main: arith_test.c
+    fn_name: addition
+    args: [-1, 3]
+
+  - test_name: subtraction_01
+    test_dir: test_source/test-arithmetic
+    test_main: arith_test.c
+    fn_name: subtraction
+    args: [123, 456]
+
+  - test_name: subtraction_02
+    test_dir: test_source/test-arithmetic
+    test_main: arith_test.c
+    fn_name: subtraction
+    args: [0, 0]
+
+  - test_name: subtraction_02
+    test_dir: test_source/test-arithmetic
+    test_main: arith_test.c
+    fn_name: subtraction
+    args: [-1, 3]

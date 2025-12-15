@@ -108,6 +108,7 @@ add_executable(execrv32i
         ${SRC_DIR}/rv32i/mem_rv32i.cpp
         ${SRC_DIR}/obf/obfuscate.cpp
         ${SRC_DIR}/obf/restore.cpp
+        src/rv32i/regs_rv32i.h
 )
 
 target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS} argparse::argparse)
@@ -176,7 +177,7 @@ function(add_riscv_function TARGET_NAME SOURCE_FILE)
 endfunction()
 
 # Add your virtualized functions here
-# Example: add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
+# Example: add_riscv_function(doOperation "${TARGET_DIR}/addition.c")
 
 add_riscv_function(riscv_test "${TARGET_DIR}/riscv-test.c")
 add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
