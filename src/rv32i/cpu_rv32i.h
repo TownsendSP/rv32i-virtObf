@@ -9,8 +9,8 @@
 #include <vector>
 #include <stdexcept>
 
-#include "mem_rv32i.h"
-#include "dis_rv32i.h"
+#include "../mem_rv32i.h"
+#include "../dis_rv32i.h"
 
 // Main CPU core - executes RV32I instructions
 class cpu_rv32i {

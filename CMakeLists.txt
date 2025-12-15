@@ -60,8 +60,8 @@ file(MAKE_DIRECTORY ${OUTPUT_DIR})
 # COMMON/SHARED CODE (used by multiple targets)
 # ============================================================================
 set(COMMON_SOURCES
-        ${SRC_DIR}/dis_rv32i.cpp
-        ${SRC_DIR}/dis_rv32i.h
+        ${SRC_DIR}/rv32i/dis_rv32i.cpp
+        ${SRC_DIR}/rv32i/dis_rv32i.h
         ${SRC_DIR}/ISA_CONFIG.cpp
         ${SRC_DIR}/ISA_CONFIG.h
 )
@@ -71,10 +71,10 @@ set(COMMON_SOURCES
 # TARGET 2: EMULATOR SHARED LIBRARY (Native x64)
 # ============================================================================
 add_library(emulator SHARED
-        ${SRC_DIR}/cpu_rv32i.cpp
-        ${SRC_DIR}/cpu_rv32i.h
-        ${SRC_DIR}/mem_rv32i.cpp
-        ${SRC_DIR}/mem_rv32i.h
+        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
+        ${SRC_DIR}/rv32i/cpu_rv32i.h
+        ${SRC_DIR}/rv32i/mem_rv32i.cpp
+        ${SRC_DIR}/rv32i/mem_rv32i.h
         ${COMMON_SOURCES}
 
 )
@@ -92,9 +92,9 @@ set_target_properties(emulator PROPERTIES
 # This executable provides both disassembly and emulation capabilities
 add_executable(execrv32i
         main.cpp
-        ${SRC_DIR}/dis_rv32i.cpp
-        ${SRC_DIR}/cpu_rv32i.cpp
-        ${SRC_DIR}/mem_rv32i.cpp
+        ${SRC_DIR}/rv32i/dis_rv32i.cpp
+        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
+        ${SRC_DIR}/rv32i/mem_rv32i.cpp
         ${SRC_DIR}/ISA_CONFIG.cpp
 )
 

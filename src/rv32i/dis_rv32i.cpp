@@ -1,5 +1,5 @@
 // dis_rv32i.cpp
-#include "dis_rv32i.h"
+#include "../dis_rv32i.h"
 #include <stdexcept>
 #include <sstream>
 

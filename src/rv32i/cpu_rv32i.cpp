@@ -1,4 +1,4 @@
-#include "cpu_rv32i.h"
+#include "../cpu_rv32i.h"
 
 cpu_rv32i::cpu_rv32i(): pc(0) {
     // Initialize all registers to 0

@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <memory>
 
-#include "src/cpu_rv32i.h"
+#include "src/rv32i/cpu_rv32i.h"
 #include "src/dis_rv32i.h"
 
 void print_usage(const char* progname) {
