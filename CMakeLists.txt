@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(rv32i_VirtualizingObfuscator)
 
+# Dependencies
+find_package(argparse CONFIG REQUIRED)
+
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -106,7 +110,7 @@ add_executable(execrv32i
         ${SRC_DIR}/obf/restore.cpp
 )
 
-target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
+target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS} argparse::argparse)
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
 
 # Function to compile a C source file to rv32i and extract binary

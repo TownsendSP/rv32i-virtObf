@@ -11,32 +11,12 @@
 #include <cstring>
 #include <iomanip>
 #include <memory>
+#include <argparse/argparse.hpp>
 
 #include "src/rv32i/cpu_rv32i.h"
 #include "src/rv32i/dis_rv32i.h"
 #include "src/obf/obfuscate.h"
 #include "src/obf/restore.h"
-
-void print_usage(const char* progname) {
-    std::cerr << "RV32I Disassembler and Emulator\n\n";
-    std::cerr << "Usage:\n";
-    std::cerr << "  " << progname << " dis <binary.rv32i> [base_address]\n";
-    std::cerr << "  " << progname << " emu <binary.rv32i> [arg1] [arg2] ...\n";
-    std::cerr << "\n";
-    std::cerr << "Commands:\n";
-    std::cerr << "  dis    - Disassemble a RV32I binary file\n";
-    std::cerr << "  emu    - Emulate a RV32I function with optional arguments\n";
-    std::cerr << "  obf    - Obfuscate a binary file\n";
-    std::cerr << "  deobf  - Deobfuscate a binary file\n";
-    std::cerr << "\n";
-    std::cerr << "Examples:\n";
-    std::cerr << "  " << progname << " dis output/doOperation.rv32i\n";
-    std::cerr << "  " << progname << " dis output/doOperation.rv32i 0x10000\n";
-    std::cerr << "  " << progname << " emu testing_utils/only_fn_riscv_test.rv32i 5 6\n";
-    std::cerr << "  " << progname << " obf input.rv32i output.obf\n";
-    std::cerr << "  " << progname << " deobf input.obf output.rv32i\n";
-    std::cerr << "\n";
-}
 
 /**
  * Reads a binary file and returns its contents as a vector of bytes
@@ -112,31 +92,30 @@ void print_disassembly(const std::vector<std::unique_ptr<Instruction>>& instruct
     }
 }
 
-bool disassemble(int argc, char **argv, const std::vector<uint8_t>& binary, int arg_start_index, int &value1) {
-    uint32_t baseAddress = 0;
-
-    // Parse optional base address
-    if (argc > arg_start_index) {
-        try {
-            baseAddress = std::stoul(argv[arg_start_index], nullptr, 16);
-        } catch (const std::exception& e) {
-            std::cerr << "Invalid base address: " << argv[arg_start_index] << std::endl;
-            value1 = 1;
-            return true;
-        }
+void run_disassemble(const std::string& filepath, uint32_t baseAddress, bool is_obfuscated) {
+    std::vector<uint8_t> data = read_binary_file(filepath);
+    if (is_obfuscated) {
+        restore(data);
+        std::cout << "Deobfuscated input file before processing.\n";
     }
-    std::cout << "Loaded " << binary.size() << " bytes" << std::endl;
+
+    std::cout << "Loaded " << data.size() << " bytes" << std::endl;
     std::cout << std::endl;
 
-    std::vector<std::unique_ptr<Instruction>> instructions = disassemble(binary, baseAddress);
+    std::vector<std::unique_ptr<Instruction>> instructions = disassemble(data, baseAddress);
     std::cout << "Disassembled " << instructions.size() << " instructions:" << std::endl;
     std::cout << std::string(60, '-') << std::endl;
 
     print_disassembly(instructions, baseAddress);
-    return false;
 }
 
-void emulate(int argc, char **argv, const std::vector<uint8_t>& binary, int arg_start_index) {
+void run_emulate(const std::string& filepath, const std::vector<std::string>& args, bool is_obfuscated) {
+    std::vector<uint8_t> binary = read_binary_file(filepath);
+    if (is_obfuscated) {
+        restore(binary);
+        std::cout << "Deobfuscated input file before processing.\n";
+    }
+
     mem_rv32i::init();
 
     // disassemble
@@ -163,13 +142,13 @@ void emulate(int argc, char **argv, const std::vector<uint8_t>& binary, int arg_
     int arg_reg_start = 10;
     int max_args = 8;
 
-    for (int i = arg_start_index; i < argc && (i - arg_start_index) < max_args; ++i) {
+    for (size_t i = 0; i < args.size() && i < (size_t)max_args; ++i) {
         try {
             // Support both decimal and hex (via 0 base)
-            uint32_t val = std::stoul(argv[i], nullptr, 0);
-            vm.write_reg(arg_reg_start + (i - arg_start_index), val);
+            uint32_t val = std::stoul(args[i], nullptr, 0);
+            vm.write_reg(arg_reg_start + i, val);
         } catch (const std::exception& e) {
-            std::cerr << "Warning: Failed to parse argument '" << argv[i] << "': " << e.what() << "\n";
+            std::cerr << "Warning: Failed to parse argument '" << args[i] << "': " << e.what() << "\n";
         }
     }
 
@@ -200,75 +179,101 @@ void deobfuscate_file(const std::string& input_path, const std::string& output_p
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        print_usage(argv[0]);
-        return 1;
-    }
-    
-    std::string command = argv[1];
-    
-    // Check for --obfuscated flag
-    bool is_obfuscated = false;
-    std::string filepath;
-    int arg_start_index = 0;
+    argparse::ArgumentParser program("execrv32i");
 
-    // Basic argument parsing logic
-    // argv[0] = progname
-    // argv[1] = command
-    // argv[2] = filepath OR --obfuscated
-    
-    if (std::string(argv[2]) == "--obfuscated") {
-        if (argc < 4) {
-            std::cerr << "Error: Missing filepath after --obfuscated\n";
-            return 1;
-        }
-        is_obfuscated = true;
-        filepath = argv[3];
-        arg_start_index = 4;
-    } else {
-        filepath = argv[2];
-        arg_start_index = 3;
+    argparse::ArgumentParser dis_command("dis");
+    dis_command.add_description("Disassemble a RV32I binary file");
+    dis_command.add_argument("binary")
+        .help("Path to the RV32I binary file");
+    dis_command.add_argument("base_address")
+        .help("Base address for disassembly (hex)")
+        .default_value(std::string("0"));
+    dis_command.add_argument("--obfuscated")
+        .help("Deobfuscate the input file before processing")
+        .default_value(false)
+        .implicit_value(true);
+
+    argparse::ArgumentParser emu_command("emu");
+    emu_command.add_description("Emulate a RV32I function with optional arguments");
+    emu_command.add_argument("binary")
+        .help("Path to the RV32I binary file");
+    emu_command.add_argument("args")
+        .help("Arguments to pass to the function")
+        .remaining();
+    emu_command.add_argument("--obfuscated")
+        .help("Deobfuscate the input file before processing")
+        .default_value(false)
+        .implicit_value(true);
+
+    argparse::ArgumentParser obf_command("obf");
+    obf_command.add_description("Obfuscate a rv32i file");
+    obf_command.add_argument("input")
+        .help("Input rv32i file");
+    obf_command.add_argument("output")
+        .help("Output obfuscated rv32i file");
+
+    argparse::ArgumentParser deobf_command("deobf");
+    deobf_command.add_description("Deobfuscate a rv32i file");
+    deobf_command.add_argument("input")
+        .help("Input obfuscated .obf.rv32i file");
+    deobf_command.add_argument("output")
+        .help("Output deobfuscated .rv32i file");
+
+    program.add_subparser(dis_command);
+    program.add_subparser(emu_command);
+    program.add_subparser(obf_command);
+    program.add_subparser(deobf_command);
+
+    try {
+        program.parse_args(argc, argv);
+    } catch (const std::exception& err) {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        return 1;
     }
 
     try {
-        if (command == "dis") {
-            std::vector<uint8_t> data = read_binary_file(filepath);
-            if (is_obfuscated) {
-                restore(data);
-                std::cout << "Deobfuscated input file before processing.\n";
-            }
-            int retcode;
-            if (disassemble(argc, argv, data, arg_start_index, retcode)) return retcode;
-        } else if (command == "emu") {
-            std::vector<uint8_t> data = read_binary_file(filepath);
-            if (is_obfuscated) {
-                restore(data);
-                std::cout << "Deobfuscated input file before processing.\n";
-            }
-            emulate(argc, argv, data, arg_start_index);
-        } else if (command == "obf") {
-            if (argc < 4) {
-                std::cerr << "Error: Missing output file for obf\n";
+        if (program.is_subcommand_used(dis_command)) {
+            std::string binary = dis_command.get<std::string>("binary");
+            std::string base_addr_str = dis_command.get<std::string>("base_address");
+            bool obfuscated = dis_command.get<bool>("--obfuscated");
+            
+            uint32_t base_address = 0;
+            try {
+                base_address = std::stoul(base_addr_str, nullptr, 16);
+            } catch (...) {
+                std::cerr << "Invalid base address: " << base_addr_str << std::endl;
                 return 1;
             }
-            obfuscate_file(filepath, argv[3]);
-        } else if (command == "deobf") {
-            if (argc < 4) {
-                std::cerr << "Error: Missing output file for deobf\n";
-                return 1;
+            
+            run_disassemble(binary, base_address, obfuscated);
+        } else if (program.is_subcommand_used(emu_command)) {
+            std::string binary = emu_command.get<std::string>("binary");
+            bool obfuscated = emu_command.get<bool>("--obfuscated");
+            std::vector<std::string> args;
+            try {
+                args = emu_command.get<std::vector<std::string>>("args");
+            } catch (const std::logic_error& e) {
+                // No remaining args
             }
-            deobfuscate_file(filepath, argv[3]);
-
+            
+            run_emulate(binary, args, obfuscated);
+        } else if (program.is_subcommand_used(obf_command)) {
+            std::string input = obf_command.get<std::string>("input");
+            std::string output = obf_command.get<std::string>("output");
+            obfuscate_file(input, output);
+        } else if (program.is_subcommand_used(deobf_command)) {
+            std::string input = deobf_command.get<std::string>("input");
+            std::string output = deobf_command.get<std::string>("output");
+            deobfuscate_file(input, output);
         } else {
-            std::cerr << "Error: Unknown command '" << command << "'\n";
-            print_usage(argv[0]);
+            std::cerr << program;
             return 1;
         }
-
-        return 0;
-        
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
         return 1;
     }
+
+    return 0;
 }
