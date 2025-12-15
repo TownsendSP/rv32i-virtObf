@@ -8,9 +8,9 @@ import re
 # Paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXECRV32I = os.path.join(PROJECT_ROOT, "build", "execrv32i")
-RV32I_FILES_DIR = os.path.join(PROJECT_ROOT, "automated_tests", "rv32i_files")
-CAPSTONE_SCRIPT = os.path.join(PROJECT_ROOT, "automated_tests", "testing_utils", "capstone_disasm.py")
-UNICORN_SCRIPT = os.path.join(PROJECT_ROOT, "automated_tests", "testing_utils", "unicorn_test_harness.py")
+RV32I_FILES_DIR = os.path.join(PROJECT_ROOT, "testing_infrastructure", "rv32i_files")
+CAPSTONE_SCRIPT = os.path.join(PROJECT_ROOT, "testing_infrastructure", "testing_utils", "capstone_disasm.py")
+UNICORN_SCRIPT = os.path.join(PROJECT_ROOT, "testing_infrastructure", "testing_utils", "unicorn_test_harness.py")
 
 # Register mapping (ABI -> xN)
 ABI_TO_X = {
