@@ -1,4 +1,4 @@
-#include "../cpu_rv32i.h"
+#include "cpu_rv32i.h"
 
 cpu_rv32i::cpu_rv32i(): pc(0) {
     // Initialize all registers to 0
@@ -340,4 +340,3 @@ void cpu_rv32i::execute(const std::vector<std::unique_ptr<Instruction>>& instruc
         pc = next_pc;
     }
 }
-

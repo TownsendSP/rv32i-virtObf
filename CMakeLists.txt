@@ -5,25 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ============================================================================
-# TOOLCHAIN CONFIGURATION
-# ============================================================================
-# Currently using native LLVM/Clang for both x64 and RISC-V cross-compilation
-# Uncomment and modify these to use specific toolchain installations:
 
-# --- Native x64 Toolchain (commented out - using system default) ---
-# set(CMAKE_C_COMPILER "/usr/bin/clang")
-# set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
-
-# --- RISC-V Bare-Metal Toolchain ---
-# Option 1: Use installed GNU RISC-V toolchain
-# set(RISCV_TOOLCHAIN_PREFIX "/opt/riscv32-gnu-toolchain-elf-llvm-bin")
-# set(RISCV_C_COMPILER "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-clang")
-# set(RISCV_CXX_COMPILER "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-clang++")
-# set(RISCV_OBJCOPY "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-objcopy")
-# set(RISCV_OBJDUMP "${RISCV_TOOLCHAIN_PREFIX}/bin/riscv32-unknown-elf-objdump")
-
-# Option 2: Use native LLVM with cross-compilation (CURRENT)
 set(RISCV_C_COMPILER "clang")
 set(RISCV_CXX_COMPILER "clang++")
 set(RISCV_OBJCOPY "llvm-objcopy")
@@ -33,50 +15,39 @@ set(RISCV_OBJDUMP "llvm-objdump")
 set(RISCV_ARCH "rv32i" CACHE STRING "RISC-V architecture (rv32i, rv32im, etc.)")
 set(RISCV_ABI "ilp32" CACHE STRING "RISC-V ABI (ilp32 for RV32I)")
 
-# ============================================================================
-# COMPILER FLAGS
-# ============================================================================
-
-# --- Native x64 flags ---
+# --- Native flags
 set(NATIVE_C_FLAGS -Wall -Wextra)
 set(NATIVE_CXX_FLAGS -Wall -Wextra)
 
-# --- RISC-V Bare-Metal flags (for production obfuscator) ---
+# --- rv32i flags
 set(RISCV_TARGET_FLAGS -target riscv32-unknown-elf -march=${RISCV_ARCH} -mabi=${RISCV_ABI})
 set(RISCV_LINK_FLAGS -nostdlib -nostartfiles -static)
 set(RISCV_C_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 set(RISCV_CXX_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 
-# ============================================================================
 # DIRECTORIES
-# ============================================================================
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
 set(TARGET_DIR "${CMAKE_SOURCE_DIR}/target")
 set(OUTPUT_DIR "${CMAKE_BINARY_DIR}/output")
 
 file(MAKE_DIRECTORY ${OUTPUT_DIR})
 
-# ============================================================================
-# COMMON/SHARED CODE (used by multiple targets)
-# ============================================================================
+# Common Code
 set(COMMON_SOURCES
         ${SRC_DIR}/rv32i/dis_rv32i.cpp
         ${SRC_DIR}/rv32i/dis_rv32i.h
-        ${SRC_DIR}/ISA_CONFIG.cpp
-        ${SRC_DIR}/ISA_CONFIG.h
 )
 
 
-# ============================================================================
-# TARGET 2: EMULATOR SHARED LIBRARY (Native x64)
-# ============================================================================
+# Emulator Library
 add_library(emulator SHARED
         ${SRC_DIR}/rv32i/cpu_rv32i.cpp
         ${SRC_DIR}/rv32i/cpu_rv32i.h
         ${SRC_DIR}/rv32i/mem_rv32i.cpp
         ${SRC_DIR}/rv32i/mem_rv32i.h
+        ${SRC_DIR}/obf/restore.cpp
+        ${SRC_DIR}/obf/restore.h
         ${COMMON_SOURCES}
-
 )
 
 target_compile_options(emulator PRIVATE ${NATIVE_CXX_FLAGS} -fPIC)
@@ -95,17 +66,14 @@ add_executable(execrv32i
         ${SRC_DIR}/rv32i/dis_rv32i.cpp
         ${SRC_DIR}/rv32i/cpu_rv32i.cpp
         ${SRC_DIR}/rv32i/mem_rv32i.cpp
-        ${SRC_DIR}/ISA_CONFIG.cpp
+        ${SRC_DIR}/obf/obfuscate.cpp
+        ${SRC_DIR}/obf/restore.cpp
 )
 
 target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
 
-# ============================================================================
-# TARGET 4: RISC-V VIRTUALIZED FUNCTIONS (Bare-Metal Only)
-# ============================================================================
-
-# Function to compile a C source file to RISC-V bare-metal and extract binary
+# Function to compile a C source file to rv32i and extract binary
 function(add_riscv_function TARGET_NAME SOURCE_FILE)
     set(OBJ_FILE "${OUTPUT_DIR}/${TARGET_NAME}.o")
     set(ELF_FILE "${OUTPUT_DIR}/${TARGET_NAME}.elf")

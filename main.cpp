@@ -13,7 +13,9 @@
 #include <memory>
 
 #include "src/rv32i/cpu_rv32i.h"
-#include "src/dis_rv32i.h"
+#include "src/rv32i/dis_rv32i.h"
+#include "src/obf/obfuscate.h"
+#include "src/obf/restore.h"
 
 void print_usage(const char* progname) {
     std::cerr << "RV32I Disassembler and Emulator\n\n";
@@ -22,13 +24,17 @@ void print_usage(const char* progname) {
     std::cerr << "  " << progname << " emu <binary.rv32i> [arg1] [arg2] ...\n";
     std::cerr << "\n";
     std::cerr << "Commands:\n";
-    std::cerr << "  dis  - Disassemble a RV32I binary file\n";
-    std::cerr << "  emu  - Emulate a RV32I function with optional arguments\n";
+    std::cerr << "  dis    - Disassemble a RV32I binary file\n";
+    std::cerr << "  emu    - Emulate a RV32I function with optional arguments\n";
+    std::cerr << "  obf    - Obfuscate a binary file\n";
+    std::cerr << "  deobf  - Deobfuscate a binary file\n";
     std::cerr << "\n";
     std::cerr << "Examples:\n";
     std::cerr << "  " << progname << " dis output/doOperation.rv32i\n";
     std::cerr << "  " << progname << " dis output/doOperation.rv32i 0x10000\n";
     std::cerr << "  " << progname << " emu testing_utils/only_fn_riscv_test.rv32i 5 6\n";
+    std::cerr << "  " << progname << " obf input.rv32i output.obf\n";
+    std::cerr << "  " << progname << " deobf input.obf output.rv32i\n";
     std::cerr << "\n";
 }
 
@@ -175,6 +181,26 @@ void emulate(int argc, char **argv, std::string filepath) {
     std::cout << result << std::endl;
 }
 
+void obfuscate_file(const std::string& input_path, const std::string& output_path) {
+    std::vector<uint8_t> data = read_binary_file(input_path);
+    std::vector<uint8_t> obfuscated = obfuscate(data);
+    
+    std::ofstream out(output_path, std::ios::binary);
+    if (!out) throw std::runtime_error("Failed to open output file: " + output_path);
+    out.write(reinterpret_cast<const char*>(obfuscated.data()), obfuscated.size());
+    std::cout << "Obfuscated " << data.size() << " bytes to " << output_path << std::endl;
+}
+
+void deobfuscate_file(const std::string& input_path, const std::string& output_path) {
+    std::vector<uint8_t> data = read_binary_file(input_path);
+    restore(data);
+    
+    std::ofstream out(output_path, std::ios::binary);
+    if (!out) throw std::runtime_error("Failed to open output file: " + output_path);
+    out.write(reinterpret_cast<const char*>(data.data()), data.size());
+    std::cout << "Deobfuscated " << data.size() << " bytes to " << output_path << std::endl;
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         print_usage(argv[0]);
@@ -190,6 +216,18 @@ int main(int argc, char* argv[]) {
             if (disassemble(argc, argv, filepath, retcode)) return retcode;
         } else if (command == "emu") {
             emulate(argc, argv, filepath);
+        } else if (command == "obf") {
+            if (argc < 4) {
+                std::cerr << "Error: Missing output file for obf\n";
+                return 1;
+            }
+            obfuscate_file(filepath, argv[3]);
+        } else if (command == "deobf") {
+            if (argc < 4) {
+                std::cerr << "Error: Missing output file for deobf\n";
+                return 1;
+            }
+            deobfuscate_file(filepath, argv[3]);
 
         } else {
             std::cerr << "Error: Unknown command '" << command << "'\n";

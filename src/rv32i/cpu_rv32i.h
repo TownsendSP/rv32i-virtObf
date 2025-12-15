@@ -9,8 +9,8 @@
 #include <vector>
 #include <stdexcept>
 
-#include "../mem_rv32i.h"
-#include "../dis_rv32i.h"
+#include "mem_rv32i.h"
+#include "dis_rv32i.h"
 
 // Main CPU core - executes RV32I instructions
 class cpu_rv32i {
@@ -52,6 +52,10 @@ public:
     // Execute a sequence of instructions
     void execute(const std::vector<std::unique_ptr<Instruction>>& instructions);
 };
+
+uint32_t rv32i_call(const uint8_t* bytecode, size_t size,
+                    uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3,
+                    uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7);
 
 #endif //CPU_RV32I_H
 

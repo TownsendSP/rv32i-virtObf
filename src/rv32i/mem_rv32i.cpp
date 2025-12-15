@@ -2,7 +2,7 @@
 // Created by tgsp on 12/13/25.
 //
 
-#include "../mem_rv32i.h"
+#include "mem_rv32i.h"
 
 // Static member variable initialization
 uint32_t mem_rv32i::INITIAL_SIZE = 0;

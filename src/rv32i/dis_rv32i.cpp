@@ -1,5 +1,5 @@
 // dis_rv32i.cpp
-#include "../dis_rv32i.h"
+#include "dis_rv32i.h"
 #include <stdexcept>
 #include <sstream>
 
@@ -381,4 +381,8 @@ std::string SysType::toString() const {
     std::ostringstream os;
     os << mnemonicToString(mnemonic);
     return os.str();
+}
+
+std::unique_ptr<Instruction> decodeInstruction(uint32_t rawInst) {
+    return Instruction::create(rawInst);
 }
