@@ -1,0 +1,49 @@
+cmake_minimum_required(VERSION 3.20)
+project(obfuscated_build)
+
+set(CMAKE_CXX_STANDARD 17)
+
+# Toolchain
+set(RISCV_C_COMPILER "clang")
+set(RISCV_OBJCOPY "llvm-objcopy")
+set(RISCV_ARCH "rv32i")
+set(RISCV_ABI "ilp32")
+set(RISCV_TARGET_FLAGS -target riscv32-unknown-elf -march=${RISCV_ARCH} -mabi=${RISCV_ABI})
+set(RISCV_LINK_FLAGS -nostdlib -nostartfiles -static)
+set(RISCV_C_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall -g)
+
+# Variables from script
+set(TARGET_FN_SRC "@TARGET_FN_SRC@")
+set(MAIN_SRC "@MAIN_SRC@")
+set(OUTPUT_NAME "@OUTPUT_NAME@")
+
+# 1. Compile Target Function to RV32I
+add_custom_command(
+    OUTPUT ${TARGET_FN_SRC}.o
+    COMMAND ${RISCV_C_COMPILER} ${RISCV_C_FLAGS} -c ${TARGET_FN_SRC} -o ${TARGET_FN_SRC}.o
+    DEPENDS ${TARGET_FN_SRC}
+)
+
+add_custom_command(
+    OUTPUT ${TARGET_FN_SRC}.elf
+    COMMAND ${RISCV_C_COMPILER} ${RISCV_C_FLAGS} ${RISCV_LINK_FLAGS} ${TARGET_FN_SRC}.o -o ${TARGET_FN_SRC}.elf
+    DEPENDS ${TARGET_FN_SRC}.o
+)
+
+add_custom_command(
+    OUTPUT target_fn.rv32i
+    COMMAND ${RISCV_OBJCOPY} -O binary --only-section=.text ${TARGET_FN_SRC}.elf target_fn.rv32i
+    DEPENDS ${TARGET_FN_SRC}.elf
+)
+
+add_custom_target(compile_target_fn ALL DEPENDS target_fn.rv32i)
+
+# 2. Final Link (after obfuscation and trampoline generation)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/trampoline.c")
+    add_executable(${OUTPUT_NAME}
+        ${MAIN_SRC}
+        trampoline.c
+    )
+    target_link_libraries(${OUTPUT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/libemulator_static.a")
+    set_target_properties(${OUTPUT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+endif()

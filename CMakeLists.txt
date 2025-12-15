@@ -39,7 +39,7 @@ set(COMMON_SOURCES
 )
 
 
-# Emulator Library
+# Emulator Library (Shared)
 add_library(emulator SHARED
         ${SRC_DIR}/rv32i/cpu_rv32i.cpp
         ${SRC_DIR}/rv32i/cpu_rv32i.h
@@ -55,6 +55,42 @@ set_target_properties(emulator PROPERTIES
         OUTPUT_NAME "emulator"
         PREFIX ""
         SUFFIX ".so"
+)
+
+# Emulator Library (Static)
+add_library(emulator_static STATIC
+        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
+        ${SRC_DIR}/rv32i/cpu_rv32i.h
+        ${SRC_DIR}/rv32i/mem_rv32i.cpp
+        ${SRC_DIR}/rv32i/mem_rv32i.h
+        ${SRC_DIR}/rv32i/emulator_api.cpp
+        ${SRC_DIR}/obf/restore.cpp
+        ${SRC_DIR}/obf/restore.h
+        ${COMMON_SOURCES}
+)
+
+target_compile_options(emulator_static PRIVATE ${NATIVE_CXX_FLAGS})
+set_target_properties(emulator_static PROPERTIES
+        OUTPUT_NAME "emulator_static"
+        PREFIX "lib"
+        SUFFIX ".a"
+)
+
+# ============================================================================
+# DIST TARGET
+# ============================================================================
+add_custom_target(dist
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:execrv32i> ${CMAKE_BINARY_DIR}/dist/execrv32i
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:emulator_static> ${CMAKE_BINARY_DIR}/dist/libemulator_static.a
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/rv32i/emulator_api.h ${CMAKE_BINARY_DIR}/dist/emulator_api.h
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/obf/gen_trampoline.py ${CMAKE_BINARY_DIR}/dist/gen_trampoline.py
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/obf/obfuscate.py ${CMAKE_BINARY_DIR}/dist/obfuscate.py
+    COMMAND ${CMAKE_COMMAND} -E copy ${SRC_DIR}/obf/CMakeLists.txt.template ${CMAKE_BINARY_DIR}/dist/CMakeLists.txt.template
+    COMMAND chmod +x ${CMAKE_BINARY_DIR}/dist/obfuscate.py
+    COMMAND chmod +x ${CMAKE_BINARY_DIR}/dist/gen_trampoline.py
+    DEPENDS execrv32i emulator_static
+    COMMENT "Packaging tools to ${CMAKE_BINARY_DIR}/dist"
 )
 
 # ============================================================================
