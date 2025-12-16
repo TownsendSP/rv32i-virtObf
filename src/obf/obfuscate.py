@@ -34,7 +34,7 @@ def main():
     func_impl = Path(args.func_impl).resolve()
     func_header = Path(args.func_header).resolve()
 
-    # Tools (assumed to be in current directory)
+# Tool paths
     cwd = Path.cwd()
     execrv32i = cwd / "execrv32i"
     gen_trampoline = cwd / "gen_trampoline.py"
@@ -62,7 +62,6 @@ def main():
     print(f"--- Building in {build_dir} ---")
 
     try:
-        # Copy files to build directory
         shutil.copy(main_src, build_dir / main_src.name)
         shutil.copy(func_impl, build_dir / func_impl.name)
         shutil.copy(func_header, build_dir / func_header.name)
@@ -80,18 +79,15 @@ def main():
         with open(build_dir / "CMakeLists.txt", "w") as f:
             f.write(content)
 
-        # Compile target function
         print("--- Compiling Target Function ---")
         run_command(["cmake", "."], cwd=build_dir, verbose=args.verbose)
         run_command(["make", "compile_target_fn"], cwd=build_dir, verbose=args.verbose)
 
-        # Obfuscate
         print("--- Obfuscating ---")
         input_bin = build_dir / "target_fn.rv32i"
         output_bin = build_dir / "target_fn.obf.rv32i"
         run_command([str(execrv32i), "obf", str(input_bin), str(output_bin)], verbose=args.verbose)
 
-        # Generate Trampoline
         print("--- Generating Trampoline ---")
         trampoline_src = build_dir / "trampoline.c"
         func_name = func_impl.stem
@@ -102,7 +98,6 @@ def main():
                      "--bytecode", str(output_bin),
                      "--output", str(trampoline_src)], verbose=args.verbose)
 
-        # Link Final Executable
         print("--- Linking Final Executable ---")
         # Re-run cmake to detect trampoline.c
         run_command(["cmake", "."], cwd=build_dir, verbose=args.verbose)
@@ -130,3 +125,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

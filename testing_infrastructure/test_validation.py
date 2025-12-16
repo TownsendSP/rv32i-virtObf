@@ -19,7 +19,6 @@ CAPSTONE_SCRIPT = os.path.join(TESTING_INFRA, "testing_utils", "capstone_disasm.
 UNICORN_SCRIPT = os.path.join(TESTING_INFRA, "testing_utils", "unicorn_test_harness.py")
 TEST_ARTIFACTS_DIR = os.path.join(BUILD_DIR, "test_artifacts")
 
-# Ensure test artifacts dir exists
 os.makedirs(TEST_ARTIFACTS_DIR, exist_ok=True)
 
 
@@ -34,7 +33,6 @@ class TestScenario:
         self.fn_name = config["fn_name"]
         self.args = [str(a) for a in config.get("args", [])]
 
-        # Output directory for this specific test
         self.out_dir = os.path.join(TEST_ARTIFACTS_DIR, self.test_name)
 
         # Artifact paths
@@ -57,14 +55,10 @@ class TestScenario:
             shutil.rmtree(self.out_dir)
         os.makedirs(self.out_dir)
 
-        # Prepare specific test harness with correct function name substitution
         with open(self.test_main, 'r') as f:
             main_code = f.read()
-
-        # Replace doOperation with actual function name
         main_code = main_code.replace("doOperation", self.fn_name)
 
-        # Write to temp harness
         with open(self.temp_main, 'w') as f:
             f.write(main_code)
 
@@ -84,8 +78,6 @@ class TestScenario:
             "--output-name", self.obf_exe_name,
             "--output-dir", self.out_dir
         ]
-        # Run from DIST_DIR so it finds tools
-        # Capture output to suppress it unless error
         subprocess.check_call(cmd_obf, cwd=DIST_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     def _clean_disasm(self, output: str) -> List[str]:
@@ -135,7 +127,7 @@ class TestScenario:
     def check_execution(self) -> bool:
         passed = True
 
-        # 1. Native Execution
+        # Native Execution
         try:
             start = time.perf_counter()
             proc_native = subprocess.run([self.native_bin] + self.args, capture_output=True, text=True, check=True)
@@ -145,7 +137,7 @@ class TestScenario:
             print(f"    Native Execution: \033[91mFAIL\033[0m ({e})")
             return False
 
-        # 2. Unicorn Execution
+        # Unicorn Execution
         try:
             start = time.perf_counter()
             proc_uni = subprocess.run([sys.executable, UNICORN_SCRIPT, self.target_rv32i] + self.args,
@@ -164,7 +156,7 @@ class TestScenario:
             print(f"    Unicorn Execution: \033[91mFAIL\033[0m ({e})")
             return False
 
-        # 3. Emulator (Non-Obfuscated)
+        # Emulator (Non-Obfuscated)
         try:
             start = time.perf_counter()
             proc_emu_non_obf = subprocess.run([EXECRV32I, "emu", self.target_rv32i] + self.args, capture_output=True,
@@ -175,13 +167,12 @@ class TestScenario:
             print(f"    Emulator (Non-Obf) Execution: \033[91mFAIL\033[0m ({e})")
             return False
 
-        # 4. Emulator (Obfuscated Tool)
+        # Emulator (Obfuscated Tool)
         try:
             start = time.perf_counter()
             proc_emu_obf_tool = subprocess.run([EXECRV32I, "emu", "--obfuscated", self.target_obf_rv32i] + self.args,
                                                capture_output=True, text=True, check=True)
             self.time_emu_obf_tool = time.perf_counter() - start
-            # Filter out "Deobfuscated input file before processing."
             output_lines = [line for line in proc_emu_obf_tool.stdout.splitlines() if
                             "Deobfuscated input file" not in line]
             emu_obf_tool_res = int(output_lines[-1].strip()) if output_lines else 0
@@ -189,7 +180,7 @@ class TestScenario:
             print(f"    Emulator (Obf Tool) Execution: \033[91mFAIL\033[0m ({e})")
             return False
 
-        # 5. Obfuscated Binary (Standalone)
+        # Obfuscated Binary
         try:
             start = time.perf_counter()
             proc_obf_bin = subprocess.run([self.obf_exe] + self.args, capture_output=True, text=True, check=True)
@@ -203,14 +194,12 @@ class TestScenario:
             return False
 
         # Comparisons
-        # A. Native vs Unicorn
         if native_res == uni_res:
             print("    Native vs Unicorn: \033[92mPass\033[0m")
         else:
             print(f"    Native vs Unicorn: \033[91mFAIL\033[0m (Native: {native_res}, Unicorn: {uni_res})")
             passed = False
 
-        # B. Emulator (Non-Obf) vs Unicorn
         if emu_non_obf_res == uni_res:
             print("    Emulator (Non-Obf) vs Unicorn: \033[92mPass\033[0m")
         else:
@@ -218,7 +207,6 @@ class TestScenario:
                 f"    Emulator (Non-Obf) vs Unicorn: \033[91mFAIL\033[0m (Emu: {emu_non_obf_res}, Unicorn: {uni_res})")
             passed = False
 
-        # C. Emulator (Obf Tool) vs Native
         if emu_obf_tool_res == native_res:
             print("    Emulator (Obf Tool) vs Native: \033[92mPass\033[0m")
         else:
@@ -226,7 +214,6 @@ class TestScenario:
                 f"    Emulator (Obf Tool) vs Native: \033[91mFAIL\033[0m (EmuTool: {emu_obf_tool_res}, Native: {native_res})")
             passed = False
 
-        # D. Obfuscated Binary vs Native
         if obf_bin_res == native_res:
             print("    Obfuscated Binary vs Native: \033[92mPass\033[0m")
         else:
@@ -265,19 +252,16 @@ class TestScenario:
 
         passed = True
 
-        # Disassembly Check
         if self.check_disassembly():
             print("    Disassembly Matches: \033[92mPass\033[0m")
         else:
             passed = False
 
-        # Deobfuscation Check
         if self.check_deobfuscation():
             print("    Deobfuscator Is Correct: \033[92mPass\033[0m")
         else:
             passed = False
 
-        # Execution Check (Granular)
         if not self.check_execution():
             passed = False
 

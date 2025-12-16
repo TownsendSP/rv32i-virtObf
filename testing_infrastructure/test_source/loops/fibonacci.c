@@ -1,5 +1,5 @@
 #include <stdint.h>
-int factorial(int a, int b) {
+int fibonacci(int a, int b) {
   (void)b;
   if (a <= 1) return a;
   int prev = 0;

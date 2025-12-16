@@ -80,11 +80,11 @@ tests:
     fn_name: sum_loop
     args: [5, 10]
 
-  - test_name: factorial
+  - test_name: fibonacci
     test_dir: test_source/loops
     test_main: test_loops.c
-    source_file: factorial.c
-    fn_name: factorial
+    source_file: fibonacci.c
+    fn_name: fibonacci
     args: [5, 0]
 
   - test_name: while_loop
