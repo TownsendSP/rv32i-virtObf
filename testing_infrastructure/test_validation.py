@@ -1,216 +1,345 @@
-import unittest
 import subprocess
 import os
 import sys
-import glob
+import yaml
+import shutil
 import re
+import time
+from typing import List, Dict, Any, Optional, Tuple
 
 # Paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXECRV32I = os.path.join(PROJECT_ROOT, "build", "execrv32i")
-RV32I_FILES_DIR = os.path.join(PROJECT_ROOT, "testing_infrastructure", "rv32i_files")
-CAPSTONE_SCRIPT = os.path.join(PROJECT_ROOT, "testing_infrastructure", "testing_utils", "capstone_disasm.py")
-UNICORN_SCRIPT = os.path.join(PROJECT_ROOT, "testing_infrastructure", "testing_utils", "unicorn_test_harness.py")
+BUILD_DIR = os.path.join(PROJECT_ROOT, "cmake-build-debug")
+DIST_DIR = os.path.join(BUILD_DIR, "dist")
+EXECRV32I = os.path.join(DIST_DIR, "execrv32i")
+OBFUSCATE_PY = os.path.join(DIST_DIR, "obfuscate.py")
+TESTING_INFRA = os.path.join(PROJECT_ROOT, "testing_infrastructure")
+TESTS_YAML = os.path.join(TESTING_INFRA, "tests.yaml")
+CAPSTONE_SCRIPT = os.path.join(TESTING_INFRA, "testing_utils", "capstone_disasm.py")
+UNICORN_SCRIPT = os.path.join(TESTING_INFRA, "testing_utils", "unicorn_test_harness.py")
+TEST_ARTIFACTS_DIR = os.path.join(BUILD_DIR, "test_artifacts")
 
-# Register mapping (ABI -> xN)
-ABI_TO_X = {
-    "zero": "x0", "ra": "x1", "sp": "x2", "gp": "x3", "tp": "x4", "t0": "x5", "t1": "x6", "t2": "x7",
-    "s0": "x8", "fp": "x8", "s1": "x9", "a0": "x10", "a1": "x11", "a2": "x12", "a3": "x13",
-    "a4": "x14", "a5": "x15", "a6": "x16", "a7": "x17", "s2": "x18", "s3": "x19", "s4": "x20",
-    "s5": "x21", "s6": "x22", "s7": "x23", "s8": "x24", "s9": "x25", "s10": "x26", "s11": "x27",
-    "t3": "x28", "t4": "x29", "t5": "x30", "t6": "x31"
-}
+# Ensure test artifacts dir exists
+os.makedirs(TEST_ARTIFACTS_DIR, exist_ok=True)
 
-def normalize_instruction(instr_str):
-    """
-    Normalize instruction string for comparison.
-    - Lowercase
-    - Replace ABI registers with xN
-    - Convert hex immediates to decimal
-    - Remove extra whitespace
-    """
-    instr_str = instr_str.lower().strip()
-    # Strip comments
-    if '#' in instr_str:
-        instr_str = instr_str.split('#')[0].strip()
-    
-    # Replace commas and parens with spaces for easier tokenization
-    # But keep them for structure if needed? 
-    # Let's try to tokenize by splitting on delimiters
-    tokens = re.split(r'[ ,()]+', instr_str)
-    tokens = [t for t in tokens if t] # Remove empty tokens
-    
-    normalized_tokens = []
-    for token in tokens:
-        # Check if register
-        if token in ABI_TO_X:
-            normalized_tokens.append(ABI_TO_X[token])
-        elif token.startswith('x') and token[1:].isdigit():
-            normalized_tokens.append(token) # Already xN
+
+class TestScenario:
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.test_name = config["test_name"]
+        self.test_dir = os.path.join(PROJECT_ROOT, "testing_infrastructure", config["test_dir"])
+        self.source_file = os.path.join(self.test_dir, config["source_file"])
+        self.source_header = os.path.splitext(self.source_file)[0] + ".h"
+        self.test_main = os.path.join(self.test_dir, config["test_main"])
+        self.fn_name = config["fn_name"]
+        self.args = [str(a) for a in config.get("args", [])]
+
+        # Output directory for this specific test
+        self.out_dir = os.path.join(TEST_ARTIFACTS_DIR, self.test_name)
+
+        # Artifact paths
+        self.native_bin = os.path.join(self.out_dir, f"{self.test_name}_native")
+        self.obf_exe_name = f"{self.test_name}_obf"
+        self.obf_exe = os.path.join(self.out_dir, self.obf_exe_name)
+        self.target_rv32i = os.path.join(self.out_dir, "target_fn.rv32i")
+        self.target_obf_rv32i = os.path.join(self.out_dir, "target_fn.obf.rv32i")
+        self.temp_main = os.path.join(self.out_dir, f"test_{self.test_name}.c")
+
+        # Metrics
+        self.time_native = 0.0
+        self.time_unicorn = 0.0
+        self.time_emu_non_obf = 0.0
+        self.time_emu_obf_tool = 0.0
+        self.time_obf_binary = 0.0
+
+    def setup(self):
+        if os.path.exists(self.out_dir):
+            shutil.rmtree(self.out_dir)
+        os.makedirs(self.out_dir)
+
+        # Prepare specific test harness with correct function name substitution
+        with open(self.test_main, 'r') as f:
+            main_code = f.read()
+
+        # Replace doOperation with actual function name
+        main_code = main_code.replace("doOperation", self.fn_name)
+
+        # Write to temp harness
+        with open(self.temp_main, 'w') as f:
+            f.write(main_code)
+
+    def build_native(self):
+        cmd_native = [
+            "clang", self.temp_main, self.source_file, "-o", self.native_bin,
+            "-Wno-implicit-function-declaration"
+        ]
+        subprocess.check_call(cmd_native, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+    def build_obfuscated(self):
+        cmd_obf = [
+            sys.executable, OBFUSCATE_PY,
+            "--main", self.temp_main,
+            "--func-impl", self.source_file,
+            "--func-header", self.source_header,
+            "--output-name", self.obf_exe_name,
+            "--output-dir", self.out_dir
+        ]
+        # Run from DIST_DIR so it finds tools
+        # Capture output to suppress it unless error
+        subprocess.check_call(cmd_obf, cwd=DIST_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+    def _clean_disasm(self, output: str) -> List[str]:
+        lines = []
+        has_header = "---" in output
+        parsing = not has_header
+
+        for line in output.splitlines():
+            line = line.strip()
+            if "---" in line:
+                parsing = True
+                continue
+            if not parsing:
+                continue
+            if not line:
+                continue
+            lines.append(" ".join(line.split()))
+        return lines
+
+    def _to_signed_32(self, val: int) -> int:
+        val = val & 0xFFFFFFFF
+        if val & 0x80000000:
+            return val - 0x100000000
+        return val
+
+    def check_disassembly(self) -> bool:
+        try:
+            if not os.path.exists(self.target_rv32i):
+                raise RuntimeError(f"obfuscate.py did not produce {self.target_rv32i}")
+
+            proc_my_dis = subprocess.run([EXECRV32I, "dis", self.target_rv32i, "--onlyasm"],
+                                         capture_output=True, text=True, check=True)
+            proc_cap_dis = subprocess.run(["python3", CAPSTONE_SCRIPT, self.target_rv32i, "--onlyasm"],
+                                          capture_output=True, text=True, check=True)
+
+            my_dis_output = self._clean_disasm(proc_my_dis.stdout)
+            cap_dis_output = self._clean_disasm(proc_cap_dis.stdout)
+
+            if len(my_dis_output) != len(cap_dis_output):
+                raise RuntimeError(
+                    f"Instruction count mismatch: My[{len(my_dis_output)}] vs Cap[{len(cap_dis_output)}]")
+            return True
+        except Exception as e:
+            print(f"    Disassembly Matches: \033[91mFAIL\033[0m ({e})")
+            return False
+
+    def check_execution(self) -> bool:
+        passed = True
+
+        # 1. Native Execution
+        try:
+            start = time.perf_counter()
+            proc_native = subprocess.run([self.native_bin] + self.args, capture_output=True, text=True, check=True)
+            self.time_native = time.perf_counter() - start
+            native_res = int(proc_native.stdout.strip())
+        except Exception as e:
+            print(f"    Native Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 2. Unicorn Execution
+        try:
+            start = time.perf_counter()
+            proc_uni = subprocess.run([sys.executable, UNICORN_SCRIPT, self.target_rv32i] + self.args,
+                                      capture_output=True, text=True)
+            self.time_unicorn = time.perf_counter() - start
+            if proc_uni.returncode != 0:
+                raise RuntimeError(f"Unicorn execution failed: {proc_uni.stderr}")
+
+            match = re.search(r"Result \(unsigned\): (\d+)", proc_uni.stdout)
+            if not match:
+                raise RuntimeError(f"Could not parse Unicorn output: {proc_uni.stdout}")
+
+            uni_val_unsigned = int(match.group(1))
+            uni_res = self._to_signed_32(uni_val_unsigned)
+        except Exception as e:
+            print(f"    Unicorn Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 3. Emulator (Non-Obfuscated)
+        try:
+            start = time.perf_counter()
+            proc_emu_non_obf = subprocess.run([EXECRV32I, "emu", self.target_rv32i] + self.args, capture_output=True,
+                                              text=True, check=True)
+            self.time_emu_non_obf = time.perf_counter() - start
+            emu_non_obf_res = int(proc_emu_non_obf.stdout.strip())
+        except Exception as e:
+            print(f"    Emulator (Non-Obf) Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 4. Emulator (Obfuscated Tool)
+        try:
+            start = time.perf_counter()
+            proc_emu_obf_tool = subprocess.run([EXECRV32I, "emu", "--obfuscated", self.target_obf_rv32i] + self.args,
+                                               capture_output=True, text=True, check=True)
+            self.time_emu_obf_tool = time.perf_counter() - start
+            # Filter out "Deobfuscated input file before processing."
+            output_lines = [line for line in proc_emu_obf_tool.stdout.splitlines() if
+                            "Deobfuscated input file" not in line]
+            emu_obf_tool_res = int(output_lines[-1].strip()) if output_lines else 0
+        except Exception as e:
+            print(f"    Emulator (Obf Tool) Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 5. Obfuscated Binary (Standalone)
+        try:
+            start = time.perf_counter()
+            proc_obf_bin = subprocess.run([self.obf_exe] + self.args, capture_output=True, text=True, check=True)
+            self.time_obf_binary = time.perf_counter() - start
+            obf_bin_res = int(proc_obf_bin.stdout.strip())
+        except Exception as e:
+            print(f"    Obfuscated Binary Execution: \033[91mFAIL\033[0m")
+            print(f"    DEBUG ERROR: {e}")
+            if hasattr(e, 'stderr'):
+                print(f"    DEBUG STDERR: {e.stderr}")
+            return False
+
+        # Comparisons
+        # A. Native vs Unicorn
+        if native_res == uni_res:
+            print("    Native vs Unicorn: \033[92mPass\033[0m")
         else:
-            # Check if immediate (hex or decimal)
-            try:
-                val = int(token, 0) # Handles 0x and decimal
-                normalized_tokens.append(str(val))
-            except ValueError:
-                normalized_tokens.append(token)
-                
-    norm_str = " ".join(normalized_tokens)
-    
-    # Handle aliases
-    # jal x0, offset -> j offset
-    if norm_str.startswith("jal x0 "):
-        norm_str = "j " + norm_str[7:]
-    
-    # jal x1, offset -> jal offset
-    if norm_str.startswith("jal x1 "):
-        norm_str = "jal " + norm_str[7:]
-    
-    # addi x0, x0, 0 -> nop
-    if norm_str == "addi x0 x0 0":
-        return "nop"
-        
-    # addi rd, rs, 0 -> mv rd, rs
-    # Regex: addi (x\d+) (x\d+) 0
-    match = re.match(r"addi (x\d+) (x\d+) 0", norm_str)
-    if match:
-        rd, rs = match.groups()
-        return f"mv {rd} {rs}"
-        
-    return norm_str
+            print(f"    Native vs Unicorn: \033[91mFAIL\033[0m (Native: {native_res}, Unicorn: {uni_res})")
+            passed = False
 
-class TestValidation(unittest.TestCase):
-    def setUp(self):
-        self.assertTrue(os.path.exists(EXECRV32I), f"execrv32i not found at {EXECRV32I}")
-        self.rv32i_files = glob.glob(os.path.join(RV32I_FILES_DIR, "*.rv32i"))
+        # B. Emulator (Non-Obf) vs Unicorn
+        if emu_non_obf_res == uni_res:
+            print("    Emulator (Non-Obf) vs Unicorn: \033[92mPass\033[0m")
+        else:
+            print(
+                f"    Emulator (Non-Obf) vs Unicorn: \033[91mFAIL\033[0m (Emu: {emu_non_obf_res}, Unicorn: {uni_res})")
+            passed = False
 
-    def test_disassembler(self):
-        """Compare execrv32i disassembler output with Capstone"""
-        print("\n[Disassembler Test]")
-        for rv32i_file in self.rv32i_files:
-            filename = os.path.basename(rv32i_file)
-            print(f"Testing {filename}...", end=" ", flush=True)
-            with self.subTest(file=filename):
-                # Run execrv32i
-                proc_exec = subprocess.run([EXECRV32I, "dis", rv32i_file], capture_output=True, text=True)
-                self.assertEqual(proc_exec.returncode, 0, f"execrv32i failed: {proc_exec.stderr}")
-                
-                # Run Capstone
-                proc_cap = subprocess.run([sys.executable, CAPSTONE_SCRIPT, rv32i_file], capture_output=True, text=True)
-                self.assertEqual(proc_cap.returncode, 0, f"Capstone script failed: {proc_cap.stderr}")
-                
-                # Parse outputs
-                exec_lines = self._parse_execrv32i_disasm(proc_exec.stdout)
-                cap_lines = self._parse_capstone_disasm(proc_cap.stdout)
-                
-                # Compare number of instructions
-                self.assertEqual(len(exec_lines), len(cap_lines), "Instruction count mismatch")
-                
-                # Compare each instruction
-                for i, (exec_inst, cap_inst) in enumerate(zip(exec_lines, cap_lines)):
-                    norm_exec = normalize_instruction(exec_inst)
-                    norm_cap = normalize_instruction(cap_inst)
-                    self.assertEqual(norm_exec, norm_cap, f"Mismatch at index {i}:\nExec: {exec_inst} -> {norm_exec}\nCap:  {cap_inst} -> {norm_cap}")
-            print("PASS")
+        # C. Emulator (Obf Tool) vs Native
+        if emu_obf_tool_res == native_res:
+            print("    Emulator (Obf Tool) vs Native: \033[92mPass\033[0m")
+        else:
+            print(
+                f"    Emulator (Obf Tool) vs Native: \033[91mFAIL\033[0m (EmuTool: {emu_obf_tool_res}, Native: {native_res})")
+            passed = False
 
-    def test_emulator(self):
-        """Compare execrv32i emulator output with Unicorn"""
-        print("\n[Emulator Test]")
-        
-        # Known arguments for specific files
-        known_args = {
-            "complicated_fn_riscv_test.rv32i": [["3", "5"]],
-            "only_fn_riscv_test.rv32i": [["5", "6"]],
-            "riscv_test.rv32i": [[]],
-            "doOperation.rv32i": [["10", "20", "1"]]
-        }
-        
-        for rv32i_file in self.rv32i_files:
-            filename = os.path.basename(rv32i_file)
-            
-            # Determine args to test
-            args_list = known_args.get(filename, [[]]) # Default to empty args if unknown
-            
-            for args in args_list:
-                args_str = " ".join(args)
-                print(f"Testing {filename} args=[{args_str}]...", end=" ", flush=True)
-                
-                with self.subTest(file=filename, args=args):
-                    # Run Unicorn to get ground truth
-                    cmd_uni = [sys.executable, UNICORN_SCRIPT, rv32i_file] + args
-                    proc_uni = subprocess.run(cmd_uni, capture_output=True, text=True)
-                    
-                    # Parse Unicorn result
-                    match = re.search(r"Result \(unsigned\): (\d+)", proc_uni.stdout)
-                    if not match:
-                        if "Execution failed" in proc_uni.stdout:
-                            self.fail(f"Unicorn execution failed: {proc_uni.stdout}")
-                        self.fail(f"Could not parse Unicorn output: {proc_uni.stdout}")
-                    
-                    expected_result = int(match.group(1))
-                    
-                    # Run execrv32i
-                    cmd_exec = [EXECRV32I, "emu", rv32i_file] + args
-                    proc_exec = subprocess.run(cmd_exec, capture_output=True, text=True)
-                    self.assertEqual(proc_exec.returncode, 0, f"execrv32i failed: {proc_exec.stderr}")
-                    
-                    # Parse execrv32i result (last line)
-                    lines = proc_exec.stdout.strip().splitlines()
-                    self.assertTrue(len(lines) > 0, "execrv32i produced no output")
-                    try:
-                        actual_result = int(lines[-1])
-                    except ValueError:
-                        self.fail(f"Could not parse execrv32i output: {lines[-1]}")
-                    
-                    self.assertEqual(actual_result, expected_result, f"Result mismatch for {filename} {args}")
-                print("PASS")
+        # D. Obfuscated Binary vs Native
+        if obf_bin_res == native_res:
+            print("    Obfuscated Binary vs Native: \033[92mPass\033[0m")
+        else:
+            print(f"    Obfuscated Binary vs Native: \033[91mFAIL\033[0m (ObfBin: {obf_bin_res}, Native: {native_res})")
+            passed = False
 
-    def _parse_execrv32i_disasm(self, output):
-        instructions = []
-        start_parsing = False
-        for line in output.splitlines():
-            if line.startswith("---"):
-                start_parsing = True
-                continue
-            if not start_parsing:
-                continue
-            if not line.strip():
-                continue
-                
-            # Line format: "00000000:  ff010113  ADDI x2, x2, -16"
-            # We want "ADDI x2, x2, -16"
-            # It starts at index 22 (approx)
-            parts = line.split("  ")
-            # parts[0] is "00000000:", parts[1] is "ff010113", parts[2] is "ADDI..."
-            # But splitting by double space might be fragile if instruction has double space?
-            # Let's use fixed width or regex
-            # Address is 8 chars + ":  " = 11 chars
-            # Raw is 8 chars + "  " = 10 chars
-            # Total prefix is 21 chars?
-            # Let's try regex
-            match = re.match(r"[0-9a-fA-F]+:\s+[0-9a-fA-F]+\s+(.*)", line)
-            if match:
-                instructions.append(match.group(1))
-        return instructions
+        return passed
 
-    def _parse_capstone_disasm(self, output):
-        instructions = []
-        start_parsing = False
-        for line in output.splitlines():
-            if line.startswith("---"):
-                start_parsing = True
-                continue
-            if not start_parsing:
-                continue
-            if not line.strip():
-                continue
-            
-            # Line format: "0x0        130101ff     addi sp, sp, -0x10"
-            # Split by whitespace, but instruction might have spaces
-            parts = line.split(maxsplit=2)
-            if len(parts) >= 3:
-                instructions.append(parts[2])
-        return instructions
+    def check_deobfuscation(self) -> bool:
+        try:
+            deobf_bin = os.path.join(self.out_dir, "target_fn.deobf.rv32i")
+            subprocess.check_call([EXECRV32I, "deobf", self.target_obf_rv32i, deobf_bin], stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.PIPE)
+
+            with open(self.target_rv32i, "rb") as f:
+                orig_bytes = f.read()
+            with open(deobf_bin, "rb") as f:
+                deobf_bytes = f.read()
+
+            if orig_bytes != deobf_bytes:
+                raise RuntimeError("Bytes mismatch")
+            return True
+        except Exception as e:
+            print(f"    Deobfuscator Is Correct: \033[91mFAIL\033[0m ({e})")
+            return False
+
+    def run(self):
+        print(f"Running {self.test_name}...")
+        try:
+            self.setup()
+            self.build_native()
+            self.build_obfuscated()
+        except Exception as e:
+            print(f"  \033[91mBUILD FAIL\033[0m: {e}")
+            return False
+
+        passed = True
+
+        # Disassembly Check
+        if self.check_disassembly():
+            print("    Disassembly Matches: \033[92mPass\033[0m")
+        else:
+            passed = False
+
+        # Deobfuscation Check
+        if self.check_deobfuscation():
+            print("    Deobfuscator Is Correct: \033[92mPass\033[0m")
+        else:
+            passed = False
+
+        # Execution Check (Granular)
+        if not self.check_execution():
+            passed = False
+
+        return passed
+
+
+class TestRunner:
+    def __init__(self):
+        self.config = {}
+        self.tests = []
+        self.scenarios = []
+
+    def setup_environment(self):
+        if not os.path.exists(OBFUSCATE_PY):
+            raise RuntimeError(f"obfuscate.py not found at {OBFUSCATE_PY}")
+        if not os.path.exists(EXECRV32I):
+            raise RuntimeError(f"execrv32i not found at {EXECRV32I}")
+
+        with open(TESTS_YAML, "r") as f:
+            self.config = yaml.safe_load(f)
+
+    def print_profiling_report(self):
+        print("\n" + "=" * 110)
+        print(f"{'PROFILING REPORT':^110}")
+        print("=" * 110)
+
+        # Header
+        header = f"| {'Test Name':<20} | {'Native (s)':<10} | {'Unicorn (s)':<12} | {'Emu Non-Obf':<12} | {'Emu Obf Tool':<12} | {'Obf Binary':<12} | {'Slowdown':<10} |"
+        print(header)
+        print(
+            "|" + "-" * 22 + "|" + "-" * 12 + "|" + "-" * 14 + "|" + "-" * 14 + "|" + "-" * 14 + "|" + "-" * 14 + "|" + "-" * 12 + "|")
+
+        for s in self.scenarios:
+            slowdown = s.time_obf_binary / s.time_native if s.time_native > 0 else 0.0
+            row = f"| {s.test_name:<20} | {s.time_native:<10.6f} | {s.time_unicorn:<12.6f} | {s.time_emu_non_obf:<12.6f} | {s.time_emu_obf_tool:<12.6f} | {s.time_obf_binary:<12.6f} | {slowdown:<10.2f} |"
+            print(row)
+        print("=" * 110 + "\n")
+
+    def run_all(self):
+        self.setup_environment()
+
+        tests_cfg = self.config.get("tests", [])
+        passed = 0
+        total = len(tests_cfg)
+
+        print(f"\nRunning {total} tests...\n")
+
+        for test_cfg in tests_cfg:
+            scenario = TestScenario(test_cfg)
+            self.scenarios.append(scenario)
+            if scenario.run():
+                passed += 1
+            print("-" * 40)
+
+        self.print_profiling_report()
+
+        print(f"Summary: {passed}/{total} tests passed.")
+        if passed < total:
+            sys.exit(1)
+        sys.exit(0)
+
 
 if __name__ == "__main__":
-    unittest.main()
+    runner = TestRunner()
+    runner.run_all()

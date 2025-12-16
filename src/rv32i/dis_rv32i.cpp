@@ -1,5 +1,6 @@
 // dis_rv32i.cpp
 #include "dis_rv32i.h"
+#include "regs_rv32i.h"
 #include <stdexcept>
 #include <sstream>
 
@@ -100,13 +101,13 @@ std::string IType::toString() const {
     // Loads use offset(base) syntax: LB, LH, LW, LBU, LHU
     if (mnemonic == LB || mnemonic == LH || mnemonic == LW ||
         mnemonic == LBU || mnemonic == LHU) {
-        os << " x" << int(rd)
-           << ", " << imm
-           << "(x" << int(rs1) << ")";
+        os << " " << riscv_reg_to_abi(rd)
+           << ", " << (imm < 0 ? "-0x" : "0x") << std::hex << (imm < 0 ? -imm : imm) << std::dec
+           << "(" << riscv_reg_to_abi(rs1) << ")";
     } else {
-        os << " x" << int(rd)
-           << ", x" << int(rs1)
-           << ", " << imm;
+        os << " " << riscv_reg_to_abi(rd)
+           << ", " << riscv_reg_to_abi(rs1)
+           << ", " << (imm < 0 ? "-0x" : "0x") << std::hex << (imm < 0 ? -imm : imm) << std::dec;
     }
     return os.str();
 }
@@ -128,10 +129,10 @@ UType::UType(uint32_t raw)
 
 std::string UType::toString() const {
     std::ostringstream os;
-    // use our enumâ†’string helper:
+    // use our enumâ†'string helper:
     os << mnemonicToString(mnemonic)
-            << " x" << int(rd)
-            << ", " << imm;
+            << " " << riscv_reg_to_abi(rd)
+            << ", 0x" << std::hex << imm << std::dec;
     return os.str();
 }
 
@@ -169,9 +170,9 @@ SType::SType(uint32_t raw)
 
 std::string SType::toString() const {
     std::ostringstream os;
-    os << mnemonicToString(mnemonic) << " x" << int(rs2)
-            << ", " << imm
-            << "(x" << int(rs1) << ")";
+    os << mnemonicToString(mnemonic) << " " << riscv_reg_to_abi(rs2)
+            << ", " << (imm < 0 ? "-0x" : "0x") << std::hex << (imm < 0 ? -imm : imm) << std::dec
+            << "(" << riscv_reg_to_abi(rs1) << ")";
     return os.str();
 }
 
@@ -221,9 +222,9 @@ RType::RType(uint32_t raw)
 std::string RType::toString() const {
     std::ostringstream os;
     os << mnemonicToString(mnemonic)
-            << " x" << int(rd)
-            << ", x" << int(rs1)
-            << ", x" << int(rs2);
+            << " " << riscv_reg_to_abi(rd)
+            << ", " << riscv_reg_to_abi(rs1)
+            << ", " << riscv_reg_to_abi(rs2);
     return os.str();
 }
 
@@ -277,9 +278,9 @@ BType::BType(uint32_t raw)
 std::string BType::toString() const {
     std::ostringstream os;
     os << mnemonicToString(mnemonic)
-            << " x" << int(rs1)
-            << ", x" << int(rs2)
-            << ", " << imm;
+            << " " << riscv_reg_to_abi(rs1)
+            << ", " << riscv_reg_to_abi(rs2)
+            << ", " << (imm < 0 ? "-0x" : "0x") << std::hex << (imm < 0 ? -imm : imm) << std::dec;
     return os.str();;
 }
 
@@ -315,8 +316,8 @@ JType::JType(uint32_t raw)
 std::string JType::toString() const {
     std::ostringstream os;
     os << mnemonicToString(mnemonic)
-            << " x" << int(rd)
-            << ", " << imm;
+            << " " << riscv_reg_to_abi(rd)
+            << ", " << (imm < 0 ? "-0x" : "0x") << std::hex << (imm < 0 ? -imm : imm) << std::dec;
     return os.str();
 }
 
@@ -350,9 +351,9 @@ FenceType::FenceType(uint32_t raw)
 std::string FenceType::toString() const {
     std::ostringstream os;
     os << mnemonicToString(mnemonic)
-            << " " << fm
-            << ", " << pred
-            << ", " << succ;
+            << " 0x" << std::hex << (int)fm
+            << ", 0x" << (int)pred
+            << ", 0x" << (int)succ << std::dec;
     return os.str();
 }
 
@@ -386,3 +387,5 @@ std::string SysType::toString() const {
 std::unique_ptr<Instruction> decodeInstruction(uint32_t rawInst) {
     return Instruction::create(rawInst);
 }
+
+

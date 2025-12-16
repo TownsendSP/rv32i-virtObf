@@ -1,0 +1,108 @@
+# Top-level list of tests.
+tests:
+  # Arithmetic
+  - test_name: add_01
+    test_dir: test_source/arithmetic
+    test_main: test_arithmetic.c
+    source_file: add.c
+    fn_name: add
+    args: [10, 20]
+  - test_name: add_02
+    test_dir: test_source/arithmetic
+    test_main: test_arithmetic.c
+    source_file: add.c
+    fn_name: add
+    args: [9999999, 9999999]
+
+  - test_name: sub_01
+    test_dir: test_source/arithmetic
+    test_main: test_arithmetic.c
+    source_file: sub.c
+    fn_name: sub
+    args: [50, 20]
+  - test_name: mul_01
+    test_dir: test_source/arithmetic
+    test_main: test_arithmetic.c
+    source_file: mul.c
+    fn_name: mul
+    args: [50, 20]
+
+  - test_name: bitwise_and
+    test_dir: test_source/arithmetic
+    test_main: test_arithmetic.c
+    source_file: and_op.c
+    fn_name: and_op
+    args: [255, 15]
+
+  - test_name: bitwise_shl
+    test_dir: test_source/arithmetic
+    test_main: test_arithmetic.c
+    source_file: shl.c
+    fn_name: shl
+    args: [1, 4]
+
+  # Branching
+  - test_name: simple_if_true
+    test_dir: test_source/branching
+    test_main: test_branching.c
+    source_file: simple_if.c
+    fn_name: simple_if
+    args: [10, 5]
+
+  - test_name: simple_if_false
+    test_dir: test_source/branching
+    test_main: test_branching.c
+    source_file: simple_if.c
+    fn_name: simple_if
+    args: [3, 8]
+
+  - test_name: nested_if
+    test_dir: test_source/branching
+    test_main: test_branching.c
+    source_file: nested_if.c
+    fn_name: nested_if
+    args: [10, 5]
+
+  - test_name: switch_case_2
+    test_dir: test_source/branching
+    test_main: test_branching.c
+    source_file: switch_case.c
+    fn_name: switch_case
+    args: [2, 100]
+
+  # Loops
+  - test_name: sum_loop
+    test_dir: test_source/loops
+    test_main: test_loops.c
+    source_file: sum_loop.c
+    fn_name: sum_loop
+    args: [5, 10]
+
+  - test_name: factorial
+    test_dir: test_source/loops
+    test_main: test_loops.c
+    source_file: factorial.c
+    fn_name: factorial
+    args: [5, 0]
+
+  - test_name: while_loop
+    test_dir: test_source/loops
+    test_main: test_loops.c
+    source_file: while_loop.c
+    fn_name: while_loop
+    args: [0, 5]
+
+  # Pointers
+  - test_name: array_swap
+    test_dir: test_source/pointers
+    test_main: test_pointers.c
+    source_file: array_swap.c
+    fn_name: array_swap
+    args: [11, 22]
+
+  - test_name: ptr_arithmetic
+    test_dir: test_source/pointers
+    test_main: test_pointers.c
+    source_file: ptr_arithmetic.c
+    fn_name: ptr_arithmetic
+    args: [10, 20]

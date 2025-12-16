@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(rv32i_VirtualizingObfuscator)
 
 # Dependencies
-find_package(argparse CONFIG REQUIRED)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 
 set(CMAKE_CXX_STANDARD 17)
@@ -25,7 +25,7 @@ set(NATIVE_CXX_FLAGS -Wall -Wextra)
 
 # --- rv32i flags
 set(RISCV_TARGET_FLAGS -target riscv32-unknown-elf -march=${RISCV_ARCH} -mabi=${RISCV_ABI})
-set(RISCV_LINK_FLAGS -nostdlib -nostartfiles -static)
+set(RISCV_LINK_FLAGS -nostdlib -nostartfiles -static -fuse-ld=lld)
 set(RISCV_C_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 set(RISCV_CXX_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 
@@ -108,9 +108,10 @@ add_executable(execrv32i
         ${SRC_DIR}/rv32i/mem_rv32i.cpp
         ${SRC_DIR}/obf/obfuscate.cpp
         ${SRC_DIR}/obf/restore.cpp
+        src/rv32i/regs_rv32i.h
 )
 
-target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS} argparse::argparse)
+target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
 
 # Function to compile a C source file to rv32i and extract binary
@@ -176,7 +177,7 @@ function(add_riscv_function TARGET_NAME SOURCE_FILE)
 endfunction()
 
 # Add your virtualized functions here
-# Example: add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
+# Example: add_riscv_function(doOperation "${TARGET_DIR}/addition.c")
 
 add_riscv_function(riscv_test "${TARGET_DIR}/riscv-test.c")
 add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")

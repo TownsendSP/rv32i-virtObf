@@ -53,7 +53,7 @@ target_link_libraries(obfuscator_tool emulator_static)
 # OBFUSCATION PIPELINE
 # ============================================================================
 
-# 1. Compile, Link, and Extract doOperation.c
+# 1. Compile, Link, and Extract addition.c
 add_custom_command(
     OUTPUT doOperation.rv32i doOperation.elf
     COMMAND ${RISCV_C_COMPILER} ${RISCV_C_FLAGS} -c ${CMAKE_CURRENT_SOURCE_DIR}/doOperation.c -o doOperation.o
