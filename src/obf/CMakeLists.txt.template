@@ -17,7 +17,7 @@ set(TARGET_FN_SRC "@TARGET_FN_SRC@")
 set(MAIN_SRC "@MAIN_SRC@")
 set(OUTPUT_NAME "@OUTPUT_NAME@")
 
-# 1. Compile Target Function to RV32I
+# Target Function to RV32I
 add_custom_command(
     OUTPUT ${TARGET_FN_SRC}.o
     COMMAND ${RISCV_C_COMPILER} ${RISCV_C_FLAGS} -c ${TARGET_FN_SRC} -o ${TARGET_FN_SRC}.o
@@ -38,7 +38,7 @@ add_custom_command(
 
 add_custom_target(compile_target_fn ALL DEPENDS target_fn.rv32i)
 
-# 2. Final Link (after obfuscation and trampoline generation)
+# Link (after obfuscation and trampoline generation)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/trampoline.c")
     add_executable(${OUTPUT_NAME}
         ${MAIN_SRC}

@@ -12,9 +12,9 @@ extern "C" {
 uint32_t rv32i_call(const uint8_t* bytecode, size_t size, ...) {
     cpu_rv32i cpu;
 
-    // Load program into memory
+    // load
     std::vector<uint8_t> code(bytecode, bytecode + size);
-    restore(code); // Restore obfuscated code
+    deobfuscate(code);
     cpu.load_program(code);
 
     // Decode instructions from the restored code
@@ -56,7 +56,7 @@ uint64_t rv32i_call64(const uint8_t* bytecode, size_t size, ...) {
 
     // Load program into memory
     std::vector<uint8_t> code(bytecode, bytecode + size);
-    restore(code); // Restore obfuscated code
+    deobfuscate(code); // Restore obfuscated code
     cpu.load_program(code);
 
     // Decode instructions from the restored code

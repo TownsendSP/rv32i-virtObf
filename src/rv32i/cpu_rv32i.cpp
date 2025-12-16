@@ -11,7 +11,7 @@ cpu_rv32i::cpu_rv32i(): pc(0) {
 
 void cpu_rv32i::load_program(const std::vector<uint8_t> &program) {
     memory.load_code(program);
-    pc = memory.get_code_base();  // Start execution at beginning of code
+    pc = memory.get_code_base();
 }
 
 uint32_t cpu_rv32i::read_reg(uint8_t reg) const {
@@ -49,7 +49,6 @@ void cpu_rv32i::execute(const std::vector<std::unique_ptr<Instruction>>& instruc
     uint32_t code_base = memory.get_code_base();
 
     while (true) {
-        // 1. Fetch logic (virtual)
         if (pc < code_base) {
             throw std::runtime_error("PC out of bounds (underflow)");
         }
@@ -322,11 +321,10 @@ void cpu_rv32i::execute(const std::vector<std::unique_ptr<Instruction>>& instruc
                 break;
             }
 
-            // ---------------- Misc ----------------
+            // Unimplemented
             case FENCE:
             case FENCE_TSO:
             case PAUSE:
-                // No-op for now
                 break;
 
             case ECALL:

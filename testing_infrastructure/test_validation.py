@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional, Tuple
 
 # Paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUILD_DIR = os.path.join(PROJECT_ROOT, "cmake-build-debug")
+BUILD_DIR = os.path.join(PROJECT_ROOT, "cmake-build-release")
 DIST_DIR = os.path.join(BUILD_DIR, "dist")
 EXECRV32I = os.path.join(DIST_DIR, "execrv32i")
 OBFUSCATE_PY = os.path.join(DIST_DIR, "obfuscate.py")
