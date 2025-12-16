@@ -99,7 +99,7 @@ void run_disassemble(const std::string &filepath, uint32_t baseAddress,
                      bool is_obfuscated, bool only_asm) {
   std::vector<uint8_t> data = read_binary_file(filepath);
   if (is_obfuscated) {
-    restore(data);
+    deobfuscate(data);
     std::cout << "Deobfuscated input file before processing.\n";
   }
 
@@ -119,7 +119,7 @@ void run_emulate(const std::string &filepath,
                  const std::vector<std::string> &args, bool is_obfuscated) {
   std::vector<uint8_t> binary = read_binary_file(filepath);
   if (is_obfuscated) {
-    restore(binary);
+    deobfuscate(binary);
     std::cout << "Deobfuscated input file before processing.\n";
   }
 
@@ -182,7 +182,7 @@ void obfuscate_file(const std::string &input_path,
 void deobfuscate_file(const std::string &input_path,
                       const std::string &output_path) {
   std::vector<uint8_t> data = read_binary_file(input_path);
-  restore(data);
+  deobfuscate(data);
 
   std::ofstream out(output_path, std::ios::binary);
   if (!out)

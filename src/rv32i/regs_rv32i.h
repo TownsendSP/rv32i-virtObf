@@ -63,17 +63,15 @@ static const riscv_reg_map_t riscv_reg_map[] = {
 
 #define RISCV_REG_MAP_SIZE (sizeof(riscv_reg_map) / sizeof(riscv_reg_map[0]))
 
-// Helper function to get register number from ABI name
 static inline int riscv_abi_to_reg(const char* abi_name) {
     for (int i = 0; i < RISCV_REG_MAP_SIZE; i++) {
         if (strcmp(riscv_reg_map[i].abi_name, abi_name) == 0) {
             return riscv_reg_map[i].reg_num;
         }
     }
-    return -1; // Not found
+    return -1;
 }
 
-// Helper function to get ABI name from register number
 static inline const char* riscv_reg_to_abi(int reg_num) {
     if (reg_num >= 0 && reg_num < 32) {
         return riscv_abi_names[reg_num];

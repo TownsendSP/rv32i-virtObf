@@ -4,7 +4,6 @@
 #include <vector>
 #include <cstdint>
 
-// Restore data: Reverse bytes then XOR with 0xDEADBEEF
-void restore(std::vector<uint8_t>& data);
+void deobfuscate(std::vector<uint8_t>& data);
 
 #endif // RESTORE_H

@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C" { // Has to be C callable since the target programs are C
 #endif
 
 // Execute RV32I bytecode with the given arguments

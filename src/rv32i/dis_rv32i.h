@@ -199,7 +199,6 @@ public:
 private:
 };
 
-// Factory method to create proper Instruction type from raw
 std::unique_ptr<Instruction> decodeInstruction(uint32_t rawInst);
 
 #endif // DIS_RV32I_H

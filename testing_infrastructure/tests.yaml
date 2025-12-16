@@ -7,6 +7,7 @@ tests:
     source_file: add.c
     fn_name: add
     args: [10, 20]
+
   - test_name: add_02
     test_dir: test_source/arithmetic
     test_main: test_arithmetic.c
@@ -20,6 +21,7 @@ tests:
     source_file: sub.c
     fn_name: sub
     args: [50, 20]
+
   - test_name: mul_01
     test_dir: test_source/arithmetic
     test_main: test_arithmetic.c

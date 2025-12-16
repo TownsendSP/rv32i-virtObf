@@ -31,7 +31,6 @@ set(RISCV_CXX_FLAGS ${RISCV_TARGET_FLAGS} -O0 -Wall)
 
 # DIRECTORIES
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
-set(TARGET_DIR "${CMAKE_SOURCE_DIR}/target")
 set(OUTPUT_DIR "${CMAKE_BINARY_DIR}/output")
 
 file(MAKE_DIRECTORY ${OUTPUT_DIR})
@@ -42,13 +41,24 @@ set(COMMON_SOURCES
         ${SRC_DIR}/rv32i/dis_rv32i.h
 )
 
-
-# Emulator Library (Shared)
+# Emulator (Shared)
 add_library(emulator SHARED
         ${SRC_DIR}/rv32i/cpu_rv32i.cpp
         ${SRC_DIR}/rv32i/cpu_rv32i.h
         ${SRC_DIR}/rv32i/mem_rv32i.cpp
         ${SRC_DIR}/rv32i/mem_rv32i.h
+        ${SRC_DIR}/obf/restore.cpp
+        ${SRC_DIR}/obf/restore.h
+        ${COMMON_SOURCES}
+)
+
+# Emulator (Static)
+add_library(emulator_static STATIC
+        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
+        ${SRC_DIR}/rv32i/cpu_rv32i.h
+        ${SRC_DIR}/rv32i/mem_rv32i.cpp
+        ${SRC_DIR}/rv32i/mem_rv32i.h
+        ${SRC_DIR}/rv32i/emulator_api.cpp
         ${SRC_DIR}/obf/restore.cpp
         ${SRC_DIR}/obf/restore.h
         ${COMMON_SOURCES}
@@ -61,18 +71,6 @@ set_target_properties(emulator PROPERTIES
         SUFFIX ".so"
 )
 
-# Emulator Library (Static)
-add_library(emulator_static STATIC
-        ${SRC_DIR}/rv32i/cpu_rv32i.cpp
-        ${SRC_DIR}/rv32i/cpu_rv32i.h
-        ${SRC_DIR}/rv32i/mem_rv32i.cpp
-        ${SRC_DIR}/rv32i/mem_rv32i.h
-        ${SRC_DIR}/rv32i/emulator_api.cpp
-        ${SRC_DIR}/obf/restore.cpp
-        ${SRC_DIR}/obf/restore.h
-        ${COMMON_SOURCES}
-)
-
 target_compile_options(emulator_static PRIVATE ${NATIVE_CXX_FLAGS})
 set_target_properties(emulator_static PROPERTIES
         OUTPUT_NAME "emulator_static"
@@ -80,9 +78,7 @@ set_target_properties(emulator_static PROPERTIES
         SUFFIX ".a"
 )
 
-# ============================================================================
-# DIST TARGET
-# ============================================================================
+# dist target for final build
 add_custom_target(dist
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/dist
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:execrv32i> ${CMAKE_BINARY_DIR}/dist/execrv32i
@@ -97,10 +93,7 @@ add_custom_target(dist
     COMMENT "Packaging tools to ${CMAKE_BINARY_DIR}/dist"
 )
 
-# ============================================================================
-# TARGET 3: EXECRV32I - Unified Disassembler and Emulator (Native x64)
-# ============================================================================
-# This executable provides both disassembly and emulation capabilities
+# execrv32i: disassembler, emulator, obfuscator
 add_executable(execrv32i
         main.cpp
         ${SRC_DIR}/rv32i/dis_rv32i.cpp
@@ -114,113 +107,7 @@ add_executable(execrv32i
 target_link_libraries(execrv32i PRIVATE emulator ${CMAKE_DL_LIBS})
 target_compile_options(execrv32i PRIVATE ${NATIVE_CXX_FLAGS})
 
-# Function to compile a C source file to rv32i and extract binary
-function(add_riscv_function TARGET_NAME SOURCE_FILE)
-    set(OBJ_FILE "${OUTPUT_DIR}/${TARGET_NAME}.o")
-    set(ELF_FILE "${OUTPUT_DIR}/${TARGET_NAME}.elf")
-    set(BIN_FILE "${OUTPUT_DIR}/${TARGET_NAME}.rv32i")
-    set(ASM_FILE "${OUTPUT_DIR}/${TARGET_NAME}.asm")
-
-    # Step 1: Compile to object file
-    add_custom_command(
-            OUTPUT ${OBJ_FILE}
-            COMMAND ${RISCV_C_COMPILER}
-            ${RISCV_C_FLAGS}
-            -c ${SOURCE_FILE}
-            -o ${OBJ_FILE}
-            DEPENDS ${SOURCE_FILE}
-            COMMENT "Compiling ${TARGET_NAME} to RISC-V bare-metal object file"
-            VERBATIM
-    )
-
-    # Step 2: Link to ELF
-    add_custom_command(
-            OUTPUT ${ELF_FILE}
-            COMMAND ${RISCV_C_COMPILER}
-            ${RISCV_C_FLAGS}
-            ${RISCV_LINK_FLAGS}
-            ${OBJ_FILE}
-            -o ${ELF_FILE}
-            DEPENDS ${OBJ_FILE}
-            COMMENT "Linking ${TARGET_NAME} to RISC-V bare-metal ELF"
-            VERBATIM
-    )
-
-    # Step 3: Extract .text section as raw binary
-    add_custom_command(
-            OUTPUT ${BIN_FILE}
-            COMMAND ${RISCV_OBJCOPY}
-            -O binary
-            --only-section=.text
-            ${ELF_FILE}
-            ${BIN_FILE}
-            DEPENDS ${ELF_FILE}
-            COMMENT "Extracting .text section to ${TARGET_NAME}.rv32i"
-            VERBATIM
-    )
-
-    # Step 4: Generate assembly listing (for debugging/verification)
-    add_custom_command(
-            OUTPUT ${ASM_FILE}
-            COMMAND ${RISCV_OBJDUMP}
-            -d ${ELF_FILE}
-            > ${ASM_FILE}
-            DEPENDS ${ELF_FILE}
-            COMMENT "Generating disassembly listing for ${TARGET_NAME}"
-            VERBATIM
-    )
-
-    # Create a target that depends on all outputs
-    add_custom_target(${TARGET_NAME} ALL
-            DEPENDS ${OBJ_FILE} ${ELF_FILE} ${BIN_FILE} ${ASM_FILE}
-    )
-endfunction()
-
-# Add your virtualized functions here
-# Example: add_riscv_function(doOperation "${TARGET_DIR}/addition.c")
-
-add_riscv_function(riscv_test "${TARGET_DIR}/riscv-test.c")
-add_riscv_function(doOperation "${TARGET_DIR}/doOperation.c")
-
-# ============================================================================
-# CONVENIENCE TARGETS
-# ============================================================================
-
-# Build all native (x64) components
-add_custom_target(native ALL
-        DEPENDS emulator execrv32i
-)
-
-# Build all RISC-V components
-add_custom_target(riscv ALL
-        DEPENDS riscv_test doOperation
-)
-
-# Build everything
-add_custom_target(all_targets ALL
-        DEPENDS native riscv
-)
-
-# ============================================================================
-# INSTALLATION (Optional)
-# ============================================================================
-install(TARGETS execrv32i emulator
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-)
-
-install(FILES
-        ${OUTPUT_DIR}/riscv_test.rv32i
-        ${OUTPUT_DIR}/riscv_test.elf
-        ${OUTPUT_DIR}/riscv_test.asm
-        DESTINATION share/rv32i-obfuscator
-        OPTIONAL
-)
-
-# ============================================================================
-# ============================================================================
-# SUMMARY
-# ============================================================================
+# summary:
 message(STATUS "=== Build Configuration ===")
 message(STATUS "Native C Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "Native C++ Compiler: ${CMAKE_CXX_COMPILER}")
