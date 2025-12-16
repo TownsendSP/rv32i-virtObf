@@ -6,13 +6,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-extern int32_t doOperation(int32_t a, int32_t b);
+extern int doOperation(int a, int b);
 
 int main(int argc, char *argv[]) {
-    int32_t a = atoi(argv[1]);
-    int32_t b = atoi(argv[2]);
+    int a = atoi(argv[1]);
+    int b = atoi(argv[2]);
 
-    int32_t got = doOperation(a, b);
+    int got = doOperation(a, b);
 
     printf("doOperation(%d, %d) = %d\n", a, b, got);
     return got;
