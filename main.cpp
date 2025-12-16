@@ -19,9 +19,9 @@
 #include "src/rv32i/dis_rv32i.h"
 #include "src/rv32i/regs_rv32i.h"
 
-/**
- * Reads a binary file and returns its contents as a vector of bytes
- */
+
+// Reads a binary file and returns its contents as a vector of bytes
+
 std::vector<uint8_t> read_binary_file(const std::string &filepath) {
   std::ifstream file(filepath, std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
@@ -39,15 +39,15 @@ std::vector<uint8_t> read_binary_file(const std::string &filepath) {
   return buffer;
 }
 
-/**
- * Disassembles a binary buffer into a vector of Instruction objects
- * Assumes little-endian byte order
- */
+
+// Disassembles a binary buffer into a vector of Instruction objects
+// Assumes little-endian byte order
+
 std::vector<std::unique_ptr<Instruction>>
 disassemble(const std::vector<uint8_t> &binary, uint32_t baseAddress = 0) {
   std::vector<std::unique_ptr<Instruction>> instructions;
 
-  // RISC-V instructions are 4 bytes aligned
+  // 4 byte alignment
   if (binary.size() % 4 != 0) {
     std::cerr << "Warning: Binary size is not a multiple of 4 bytes"
               << std::endl;
@@ -72,9 +72,6 @@ disassemble(const std::vector<uint8_t> &binary, uint32_t baseAddress = 0) {
   return instructions;
 }
 
-/**
- * Prints disassembly with addresses
- */
 void print_disassembly(
     const std::vector<std::unique_ptr<Instruction>> &instructions,
     uint32_t baseAddress = 0, bool only_asm = false) {
@@ -154,7 +151,6 @@ void run_emulate(const std::string &filepath,
 
   for (size_t i = 0; i < args.size() && i < (size_t)max_args; ++i) {
     try {
-      // Support both decimal and hex (via 0 base)
       uint32_t val = std::stoul(args[i], nullptr, 0);
       vm.write_reg(arg_reg_start + i, val);
     } catch (const std::exception &e) {
@@ -273,7 +269,6 @@ int main(int argc, char *argv[]) {
       try {
         args = emu_command.get<std::vector<std::string>>("args");
       } catch (const std::logic_error &e) {
-        // No remaining args
       }
 
       run_emulate(binary, args, obfuscated);

@@ -1,15 +1,15 @@
-import unittest
 import subprocess
 import os
 import sys
 import yaml
 import shutil
-import time
 import re
+import time
+from typing import List, Dict, Any, Optional, Tuple
 
 # Paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUILD_DIR = os.path.join(PROJECT_ROOT, "build")
+BUILD_DIR = os.path.join(PROJECT_ROOT, "cmake-build-debug")
 DIST_DIR = os.path.join(BUILD_DIR, "dist")
 EXECRV32I = os.path.join(DIST_DIR, "execrv32i")
 OBFUSCATE_PY = os.path.join(DIST_DIR, "obfuscate.py")
@@ -22,165 +22,77 @@ TEST_ARTIFACTS_DIR = os.path.join(BUILD_DIR, "test_artifacts")
 # Ensure test artifacts dir exists
 os.makedirs(TEST_ARTIFACTS_DIR, exist_ok=True)
 
-class TestInfrastructure(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # 0. Build 'dist' target to get tools
-        print("\n[!] Building 'dist' target...")
-        subprocess.check_call(["cmake", "-S", ".", "-B", "build"], cwd=PROJECT_ROOT)
-        # Using lld for linking in dist target too if applicable, but cmake should handle it from CMakeLists.txt
-        subprocess.check_call(["cmake", "--build", "build", "--target", "dist"], cwd=PROJECT_ROOT)
-        
-        if not os.path.exists(OBFUSCATE_PY):
-             raise RuntimeError(f"obfuscate.py not found at {OBFUSCATE_PY}")
-        if not os.path.exists(EXECRV32I):
-             raise RuntimeError(f"execrv32i not found at {EXECRV32I}")
 
-        with open(TESTS_YAML, "r") as f:
-            cls.config = yaml.safe_load(f)
+class TestScenario:
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.test_name = config["test_name"]
+        self.test_dir = os.path.join(PROJECT_ROOT, "testing_infrastructure", config["test_dir"])
+        self.source_file = os.path.join(self.test_dir, config["source_file"])
+        self.source_header = os.path.splitext(self.source_file)[0] + ".h"
+        self.test_main = os.path.join(self.test_dir, config["test_main"])
+        self.fn_name = config["fn_name"]
+        self.args = [str(a) for a in config.get("args", [])]
 
-    def test_all_scenarios(self):
-        tests = self.config.get("tests", [])
-        for test_cfg in tests:
-            with self.subTest(test_name=test_cfg["test_name"]):
-                self.run_single_test(test_cfg)
-
-    def run_single_test(self, cfg):
-        print(f"\n>>> Running Test: {cfg['test_name']}")
-        
-        test_dir = os.path.join(PROJECT_ROOT, "testing_infrastructure", cfg["test_dir"])
-        source_file = os.path.join(test_dir, cfg["source_file"])
-        # Derive header path (replace .c with .h)
-        source_header = os.path.splitext(source_file)[0] + ".h"
-        
-        test_main = os.path.join(test_dir, cfg["test_main"])
-        fn_name = cfg["fn_name"]
-        args = [str(a) for a in cfg.get("args", [])]
-        
-        base_name = cfg["test_name"]
-        
         # Output directory for this specific test
-        test_out_dir = os.path.join(TEST_ARTIFACTS_DIR, base_name)
-        if os.path.exists(test_out_dir):
-            shutil.rmtree(test_out_dir)
-        os.makedirs(test_out_dir)
-        
+        self.out_dir = os.path.join(TEST_ARTIFACTS_DIR, self.test_name)
+
         # Artifact paths
-        native_bin = os.path.join(test_out_dir, f"{base_name}_native")
-        obf_exe_name = f"{base_name}_obf" # Output name for obfuscate.py
-        obf_exe = os.path.join(test_out_dir, obf_exe_name) 
-        
-        # Paths populated by obfuscate.py
-        target_rv32i = os.path.join(test_out_dir, "target_fn.rv32i")
-        target_obf_rv32i = os.path.join(test_out_dir, "target_fn.obf.rv32i")
-        trampoline_c = os.path.join(test_out_dir, "trampoline.c")
+        self.native_bin = os.path.join(self.out_dir, f"{self.test_name}_native")
+        self.obf_exe_name = f"{self.test_name}_obf"
+        self.obf_exe = os.path.join(self.out_dir, self.obf_exe_name)
+        self.target_rv32i = os.path.join(self.out_dir, "target_fn.rv32i")
+        self.target_obf_rv32i = os.path.join(self.out_dir, "target_fn.obf.rv32i")
+        self.temp_main = os.path.join(self.out_dir, f"test_{self.test_name}.c")
+
+        # Metrics
+        self.time_native = 0.0
+        self.time_unicorn = 0.0
+        self.time_emu_non_obf = 0.0
+        self.time_emu_obf_tool = 0.0
+        self.time_obf_binary = 0.0
+
+    def setup(self):
+        if os.path.exists(self.out_dir):
+            shutil.rmtree(self.out_dir)
+        os.makedirs(self.out_dir)
 
         # Prepare specific test harness with correct function name substitution
-        with open(test_main, 'r') as f:
+        with open(self.test_main, 'r') as f:
             main_code = f.read()
-        
+
         # Replace doOperation with actual function name
-        main_code = main_code.replace("doOperation", fn_name)
-        
+        main_code = main_code.replace("doOperation", self.fn_name)
+
         # Write to temp harness
-        temp_main = os.path.join(test_out_dir, f"test_{base_name}.c")
-        with open(temp_main, 'w') as f:
+        with open(self.temp_main, 'w') as f:
             f.write(main_code)
-            
-        # 1. Compile Native Baseline
-        # Note: We don't need -DdoOperation definition anymore since we replaced it in source
+
+    def build_native(self):
         cmd_native = [
-            "clang", temp_main, source_file, "-o", native_bin,
+            "clang", self.temp_main, self.source_file, "-o", self.native_bin,
             "-Wno-implicit-function-declaration"
         ]
-        subprocess.check_call(cmd_native, cwd=PROJECT_ROOT)
+        subprocess.check_call(cmd_native, cwd=PROJECT_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-        # 2. Run obfuscate.py
-        print("Running obfuscation pipeline...")
+    def build_obfuscated(self):
         cmd_obf = [
             sys.executable, OBFUSCATE_PY,
-            "--main", temp_main,
-            "--func-impl", source_file,
-            "--func-header", source_header,
-            "--output-name", obf_exe_name,
-            "--output-dir", test_out_dir
+            "--main", self.temp_main,
+            "--func-impl", self.source_file,
+            "--func-header", self.source_header,
+            "--output-name", self.obf_exe_name,
+            "--output-dir", self.out_dir
         ]
         # Run from DIST_DIR so it finds tools
-        subprocess.check_call(cmd_obf, cwd=DIST_DIR)
-        
-        # 3. Disassembly Check (Unobfuscated .rv32i vs Capstone)
-        print("Checking Disassembly...")
-        if not os.path.exists(target_rv32i):
-            self.fail(f"obfuscate.py did not produce {target_rv32i}")
-            
-        proc_my_dis = subprocess.run([EXECRV32I, "dis", target_rv32i, "--onlyasm"], 
-                                     capture_output=True, text=True, check=True)
-        # Capstone script needs updating? We can assume it takes the binary path.
-        proc_cap_dis = subprocess.run([sys.executable, CAPSTONE_SCRIPT, target_rv32i], 
-                                      capture_output=True, text=True, check=True)
-        
-        my_dis_output = self._clean_disasm(proc_my_dis.stdout)
-        cap_dis_output = self._clean_disasm(proc_cap_dis.stdout)
-        
-        # We allow small differences or exact match?
-        # Capstone might output aliases. execrv32i might not.
-        # For now, let's assertions flexible or just print length.
-        # The user requested verification, so we should assert.
-        # But without seeing the exact output format diffs, strict equality usually fails.
-        # Let's count instructions.
-        self.assertEqual(len(my_dis_output), len(cap_dis_output), f"Instruction count mismatch: My[{len(my_dis_output)}] vs Cap[{len(cap_dis_output)}]")
-        
-        # 4. Execution Check
-        print(f"Checking Execution with args: {args}")
-        
-        # A. Native Execution
-        proc_native = subprocess.run([native_bin] + args, capture_output=True, text=True, check=True)
-        try:
-            native_res = int(proc_native.stdout.strip())
-        except ValueError:
-            self.fail(f"Invalid native output: {proc_native.stdout}")
+        # Capture output to suppress it unless error
+        subprocess.check_call(cmd_obf, cwd=DIST_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-        # B. Unicorn Execution (using the .rv32i file)
-        proc_uni = subprocess.run([sys.executable, UNICORN_SCRIPT, target_rv32i] + args,
-                                  capture_output=True, text=True)
-        if proc_uni.returncode != 0:
-             self.fail(f"Unicorn execution failed: {proc_uni.stderr}")
-        
-        match = re.search(r"Result \(unsigned\): (\d+)", proc_uni.stdout)
-        if not match:
-             self.fail(f"Could not parse Unicorn output: {proc_uni.stdout}")
-        
-        uni_val_unsigned = int(match.group(1))
-        uni_res = self._to_signed_32(uni_val_unsigned)
-        
-        # C. Obfuscated Execution (The generated executable)
-        proc_obf = subprocess.run([obf_exe] + args, capture_output=True, text=True, check=True)
-        try:
-            obf_res = int(proc_obf.stdout.strip())
-        except ValueError:
-            self.fail(f"Invalid obfuscated executable output: {proc_obf.stdout}")
-            
-        # D. Deobfuscation Check
-        deobf_bin = os.path.join(test_out_dir, "target_fn.deobf.rv32i")
-        subprocess.check_call([EXECRV32I, "deobf", target_obf_rv32i, deobf_bin])
-        
-        with open(target_rv32i, "rb") as f:
-            orig_bytes = f.read()
-        with open(deobf_bin, "rb") as f:
-             deobf_bytes = f.read()
-             
-        self.assertEqual(orig_bytes, deobf_bytes, "Deobfuscation verification failed")
-
-        # Final Comparisons
-        print(f"Results -> Native: {native_res}, Unicorn: {uni_res}, ObfExe: {obf_res}")
-        self.assertEqual(native_res, uni_res, "Native vs Unicorn mismatch")
-        self.assertEqual(native_res, obf_res, "Native vs Obfuscated mismatch")
-        
-        print("PASS")
-
-    def _clean_disasm(self, output):
+    def _clean_disasm(self, output: str) -> List[str]:
         lines = []
-        parsing = False
+        has_header = "---" in output
+        parsing = not has_header
+
         for line in output.splitlines():
             line = line.strip()
             if "---" in line:
@@ -193,11 +105,241 @@ class TestInfrastructure(unittest.TestCase):
             lines.append(" ".join(line.split()))
         return lines
 
-    def _to_signed_32(self, val):
+    def _to_signed_32(self, val: int) -> int:
         val = val & 0xFFFFFFFF
         if val & 0x80000000:
             return val - 0x100000000
         return val
 
+    def check_disassembly(self) -> bool:
+        try:
+            if not os.path.exists(self.target_rv32i):
+                raise RuntimeError(f"obfuscate.py did not produce {self.target_rv32i}")
+
+            proc_my_dis = subprocess.run([EXECRV32I, "dis", self.target_rv32i, "--onlyasm"],
+                                         capture_output=True, text=True, check=True)
+            proc_cap_dis = subprocess.run(["python3", CAPSTONE_SCRIPT, self.target_rv32i, "--onlyasm"],
+                                          capture_output=True, text=True, check=True)
+
+            my_dis_output = self._clean_disasm(proc_my_dis.stdout)
+            cap_dis_output = self._clean_disasm(proc_cap_dis.stdout)
+
+            if len(my_dis_output) != len(cap_dis_output):
+                raise RuntimeError(
+                    f"Instruction count mismatch: My[{len(my_dis_output)}] vs Cap[{len(cap_dis_output)}]")
+            return True
+        except Exception as e:
+            print(f"    Disassembly Matches: \033[91mFAIL\033[0m ({e})")
+            return False
+
+    def check_execution(self) -> bool:
+        passed = True
+
+        # 1. Native Execution
+        try:
+            start = time.perf_counter()
+            proc_native = subprocess.run([self.native_bin] + self.args, capture_output=True, text=True, check=True)
+            self.time_native = time.perf_counter() - start
+            native_res = int(proc_native.stdout.strip())
+        except Exception as e:
+            print(f"    Native Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 2. Unicorn Execution
+        try:
+            start = time.perf_counter()
+            proc_uni = subprocess.run([sys.executable, UNICORN_SCRIPT, self.target_rv32i] + self.args,
+                                      capture_output=True, text=True)
+            self.time_unicorn = time.perf_counter() - start
+            if proc_uni.returncode != 0:
+                raise RuntimeError(f"Unicorn execution failed: {proc_uni.stderr}")
+
+            match = re.search(r"Result \(unsigned\): (\d+)", proc_uni.stdout)
+            if not match:
+                raise RuntimeError(f"Could not parse Unicorn output: {proc_uni.stdout}")
+
+            uni_val_unsigned = int(match.group(1))
+            uni_res = self._to_signed_32(uni_val_unsigned)
+        except Exception as e:
+            print(f"    Unicorn Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 3. Emulator (Non-Obfuscated)
+        try:
+            start = time.perf_counter()
+            proc_emu_non_obf = subprocess.run([EXECRV32I, "emu", self.target_rv32i] + self.args, capture_output=True,
+                                              text=True, check=True)
+            self.time_emu_non_obf = time.perf_counter() - start
+            emu_non_obf_res = int(proc_emu_non_obf.stdout.strip())
+        except Exception as e:
+            print(f"    Emulator (Non-Obf) Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 4. Emulator (Obfuscated Tool)
+        try:
+            start = time.perf_counter()
+            proc_emu_obf_tool = subprocess.run([EXECRV32I, "emu", "--obfuscated", self.target_obf_rv32i] + self.args,
+                                               capture_output=True, text=True, check=True)
+            self.time_emu_obf_tool = time.perf_counter() - start
+            # Filter out "Deobfuscated input file before processing."
+            output_lines = [line for line in proc_emu_obf_tool.stdout.splitlines() if
+                            "Deobfuscated input file" not in line]
+            emu_obf_tool_res = int(output_lines[-1].strip()) if output_lines else 0
+        except Exception as e:
+            print(f"    Emulator (Obf Tool) Execution: \033[91mFAIL\033[0m ({e})")
+            return False
+
+        # 5. Obfuscated Binary (Standalone)
+        try:
+            start = time.perf_counter()
+            proc_obf_bin = subprocess.run([self.obf_exe] + self.args, capture_output=True, text=True, check=True)
+            self.time_obf_binary = time.perf_counter() - start
+            obf_bin_res = int(proc_obf_bin.stdout.strip())
+        except Exception as e:
+            print(f"    Obfuscated Binary Execution: \033[91mFAIL\033[0m")
+            print(f"    DEBUG ERROR: {e}")
+            if hasattr(e, 'stderr'):
+                print(f"    DEBUG STDERR: {e.stderr}")
+            return False
+
+        # Comparisons
+        # A. Native vs Unicorn
+        if native_res == uni_res:
+            print("    Native vs Unicorn: \033[92mPass\033[0m")
+        else:
+            print(f"    Native vs Unicorn: \033[91mFAIL\033[0m (Native: {native_res}, Unicorn: {uni_res})")
+            passed = False
+
+        # B. Emulator (Non-Obf) vs Unicorn
+        if emu_non_obf_res == uni_res:
+            print("    Emulator (Non-Obf) vs Unicorn: \033[92mPass\033[0m")
+        else:
+            print(
+                f"    Emulator (Non-Obf) vs Unicorn: \033[91mFAIL\033[0m (Emu: {emu_non_obf_res}, Unicorn: {uni_res})")
+            passed = False
+
+        # C. Emulator (Obf Tool) vs Native
+        if emu_obf_tool_res == native_res:
+            print("    Emulator (Obf Tool) vs Native: \033[92mPass\033[0m")
+        else:
+            print(
+                f"    Emulator (Obf Tool) vs Native: \033[91mFAIL\033[0m (EmuTool: {emu_obf_tool_res}, Native: {native_res})")
+            passed = False
+
+        # D. Obfuscated Binary vs Native
+        if obf_bin_res == native_res:
+            print("    Obfuscated Binary vs Native: \033[92mPass\033[0m")
+        else:
+            print(f"    Obfuscated Binary vs Native: \033[91mFAIL\033[0m (ObfBin: {obf_bin_res}, Native: {native_res})")
+            passed = False
+
+        return passed
+
+    def check_deobfuscation(self) -> bool:
+        try:
+            deobf_bin = os.path.join(self.out_dir, "target_fn.deobf.rv32i")
+            subprocess.check_call([EXECRV32I, "deobf", self.target_obf_rv32i, deobf_bin], stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.PIPE)
+
+            with open(self.target_rv32i, "rb") as f:
+                orig_bytes = f.read()
+            with open(deobf_bin, "rb") as f:
+                deobf_bytes = f.read()
+
+            if orig_bytes != deobf_bytes:
+                raise RuntimeError("Bytes mismatch")
+            return True
+        except Exception as e:
+            print(f"    Deobfuscator Is Correct: \033[91mFAIL\033[0m ({e})")
+            return False
+
+    def run(self):
+        print(f"Running {self.test_name}...")
+        try:
+            self.setup()
+            self.build_native()
+            self.build_obfuscated()
+        except Exception as e:
+            print(f"  \033[91mBUILD FAIL\033[0m: {e}")
+            return False
+
+        passed = True
+
+        # Disassembly Check
+        if self.check_disassembly():
+            print("    Disassembly Matches: \033[92mPass\033[0m")
+        else:
+            passed = False
+
+        # Deobfuscation Check
+        if self.check_deobfuscation():
+            print("    Deobfuscator Is Correct: \033[92mPass\033[0m")
+        else:
+            passed = False
+
+        # Execution Check (Granular)
+        if not self.check_execution():
+            passed = False
+
+        return passed
+
+
+class TestRunner:
+    def __init__(self):
+        self.config = {}
+        self.tests = []
+        self.scenarios = []
+
+    def setup_environment(self):
+        if not os.path.exists(OBFUSCATE_PY):
+            raise RuntimeError(f"obfuscate.py not found at {OBFUSCATE_PY}")
+        if not os.path.exists(EXECRV32I):
+            raise RuntimeError(f"execrv32i not found at {EXECRV32I}")
+
+        with open(TESTS_YAML, "r") as f:
+            self.config = yaml.safe_load(f)
+
+    def print_profiling_report(self):
+        print("\n" + "=" * 110)
+        print(f"{'PROFILING REPORT':^110}")
+        print("=" * 110)
+
+        # Header
+        header = f"| {'Test Name':<20} | {'Native (s)':<10} | {'Unicorn (s)':<12} | {'Emu Non-Obf':<12} | {'Emu Obf Tool':<12} | {'Obf Binary':<12} | {'Slowdown':<10} |"
+        print(header)
+        print(
+            "|" + "-" * 22 + "|" + "-" * 12 + "|" + "-" * 14 + "|" + "-" * 14 + "|" + "-" * 14 + "|" + "-" * 14 + "|" + "-" * 12 + "|")
+
+        for s in self.scenarios:
+            slowdown = s.time_obf_binary / s.time_native if s.time_native > 0 else 0.0
+            row = f"| {s.test_name:<20} | {s.time_native:<10.6f} | {s.time_unicorn:<12.6f} | {s.time_emu_non_obf:<12.6f} | {s.time_emu_obf_tool:<12.6f} | {s.time_obf_binary:<12.6f} | {slowdown:<10.2f} |"
+            print(row)
+        print("=" * 110 + "\n")
+
+    def run_all(self):
+        self.setup_environment()
+
+        tests_cfg = self.config.get("tests", [])
+        passed = 0
+        total = len(tests_cfg)
+
+        print(f"\nRunning {total} tests...\n")
+
+        for test_cfg in tests_cfg:
+            scenario = TestScenario(test_cfg)
+            self.scenarios.append(scenario)
+            if scenario.run():
+                passed += 1
+            print("-" * 40)
+
+        self.print_profiling_report()
+
+        print(f"Summary: {passed}/{total} tests passed.")
+        if passed < total:
+            sys.exit(1)
+        sys.exit(0)
+
+
 if __name__ == "__main__":
-    unittest.main()
+    runner = TestRunner()
+    runner.run_all()

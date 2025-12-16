@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import argparse
 from capstone import *
@@ -5,7 +6,7 @@ from capstone import *
 def main():
     parser = argparse.ArgumentParser(description="Disassemble RISC-V 32-bit binary with Capstone")
     parser.add_argument('file', help='file to disassemble')
-    parser.add_argument('onlyasm', action='store_true', help='Only output the assembly instructions')
+    parser.add_argument('--onlyasm', action='store_true', help='Only output the assembly instructions')
     args = parser.parse_args()
 
     filename = args.file

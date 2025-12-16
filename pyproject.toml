@@ -9,7 +9,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "unicorn (>=2.1.4,<3.0.0)",
-    "capstone (==6.0.0a5)"
+    "capstone (==6.0.0a5)",
+    "pyyaml (>=6.0.3,<7.0.0)"
 ]
 
 
