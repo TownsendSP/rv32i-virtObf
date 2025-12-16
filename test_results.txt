@@ -1,0 +1,141 @@
+Running 15 tests...
+
+Running add_01...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running add_02...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running sub_01...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running mul_01...
+  BUILD FAIL
+----------------------------------------
+Running bitwise_and...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running bitwise_shl...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running simple_if_true...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running simple_if_false...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running nested_if...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running switch_case_2...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running sum_loop...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running fibonacci...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running while_loop...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running array_swap...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+Running ptr_arithmetic...
+    Disassembly Matches: Pass
+    Deobfuscator Is Correct: Pass
+    Native vs Unicorn: Pass
+    Emulator (Non-Obf) vs Unicorn: Pass
+    Emulator (Obf Tool) vs Native: Pass
+    Obfuscated Binary vs Native: Pass
+----------------------------------------
+
+==============================================================================================================
+                                               PROFILING REPORT                                               
+==============================================================================================================
+| Test Name            | Native (s) | Unicorn (s)  | Emu Non-Obf  | Emu Obf Tool | Obf Binary   | Slowdown   |
+|----------------------|------------|--------------|--------------|--------------|--------------|------------|
+| add_01               | 0.000774   | 0.058020     | 0.303391     | 0.290173     | 0.993012     | 1283.74    |
+| add_02               | 0.000572   | 0.045556     | 0.226045     | 0.216168     | 0.948902     | 1659.00    |
+| sub_01               | 0.000469   | 0.045946     | 0.241399     | 0.161461     | 0.822735     | 1755.10    |
+| mul_01               | 0.000000   | 0.000000     | 0.000000     | 0.000000     | 0.000000     | 0.00       |
+| bitwise_and          | 0.000608   | 0.048815     | 0.110241     | 0.114404     | 0.589890     | 970.39     |
+| bitwise_shl          | 0.000486   | 0.045917     | 0.117964     | 0.106393     | 0.684842     | 1409.54    |
+| simple_if_true       | 0.000591   | 0.059265     | 0.146451     | 0.223398     | 0.745024     | 1259.77    |
+| simple_if_false      | 0.000744   | 0.053339     | 0.145776     | 0.139080     | 0.635347     | 853.74     |
+| nested_if            | 0.000565   | 0.092563     | 0.208540     | 0.195122     | 0.735675     | 1301.97    |
+| switch_case_2        | 0.001096   | 0.079625     | 0.188440     | 0.208901     | 0.649744     | 592.71     |
+| sum_loop             | 0.000763   | 0.089040     | 0.204367     | 0.199238     | 0.634701     | 832.29     |
+| fibonacci            | 0.000586   | 0.073671     | 0.130162     | 0.105484     | 0.404593     | 690.27     |
+| while_loop           | 0.001005   | 0.056398     | 0.149370     | 0.151681     | 0.458395     | 456.05     |
+| array_swap           | 0.000675   | 0.073730     | 0.149474     | 0.121368     | 0.433830     | 643.16     |
+| ptr_arithmetic       | 0.002400   | 0.053742     | 0.104628     | 0.104025     | 0.473312     | 197.18     |
+==============================================================================================================
+
+Summary: 14/15 tests passed.
